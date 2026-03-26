@@ -21,6 +21,7 @@ export default function RootLayout() {
       <Stack.Screen name="product/[id]" />
       <Stack.Screen name="checkout" />
       <Stack.Screen name="addresses" />
+      <Stack.Screen name="admin-login" />
       <Stack.Screen name="admin" />
     </Stack>
   );

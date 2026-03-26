@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 
 export default function Index() {
   const router = useRouter();
-  const { isAuthenticated, pincodeChecked } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -14,15 +14,13 @@ export default function Index() {
       
       if (!isAuthenticated) {
         router.replace('/login');
-      } else if (!pincodeChecked) {
-        router.replace('/pincode-check');
       } else {
         router.replace('/(tabs)');
       }
     };
 
     checkAuth();
-  }, [isAuthenticated, pincodeChecked]);
+  }, [isAuthenticated]);
 
   return (
     <View style={styles.container}>

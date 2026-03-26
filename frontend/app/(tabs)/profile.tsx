@@ -122,10 +122,10 @@ export default function Profile() {
         {/* Admin Login */}
         <TouchableOpacity
           style={styles.adminButton}
-          onPress={() => router.push('/admin')}
+          onPress={() => router.push('/admin-login')}
         >
           <Ionicons name="shield-checkmark" size={20} color="#e63946" />
-          <Text style={styles.adminButtonText}>Admin Panel</Text>
+          <Text style={styles.adminButtonText}>Admin Login</Text>
         </TouchableOpacity>
 
         {/* Logout Button */}

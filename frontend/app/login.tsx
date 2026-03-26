@@ -54,7 +54,7 @@ export default function Login() {
       const response = await authAPI.verifyOTP(phone, otp);
       if (response.data.success) {
         await setCustomer(response.data.customer);
-        router.replace('/pincode-check');
+        router.replace('/(tabs)');
       }
     } catch (error) {
       Alert.alert('Error', 'Invalid OTP. Please try again.');

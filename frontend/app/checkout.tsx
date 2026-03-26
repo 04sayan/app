@@ -22,6 +22,7 @@ import Header from '../components/Header';
 export default function Checkout() {
   const router = useRouter();
   const customer = useAuthStore((state) => state.customer);
+  const { servicePincode, setPincodeChecked } = useAuthStore();
   const { items, getTotal, clearCart } = useCartStore();
   
   const [loading, setLoading] = useState(false);
@@ -30,6 +31,8 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState('COD');
   const [location, setLocation] = useState<any>(null);
   const [locationLoading, setLocationLoading] = useState(false);
+  const [pincodeValid, setPincodeValid] = useState(false);
+  const [checkingPincode, setCheckingPincode] = useState(false);
   
   // Address fields
   const [name, setName] = useState(customer?.name || '');
@@ -37,10 +40,14 @@ export default function Checkout() {
   const [fullAddress, setFullAddress] = useState('');
   const [area, setArea] = useState('');
   const [landmark, setLandmark] = useState('');
-  const [pincode, setPincode] = useState('');
+  const [pincode, setPincode] = useState(servicePincode || '');
 
   useEffect(() => {
     loadSlots();
+    if (servicePincode) {
+      setPincode(servicePincode);
+      setPincodeValid(true);
+    }
   }, []);
 
   const loadSlots = async () => {
@@ -52,6 +59,51 @@ export default function Checkout() {
       }
     } catch (error) {
       console.error('Failed to load slots:', error);
+    }
+  };
+
+  const handleCheckPincode = async () => {
+    if (pincode.length !== 6) {
+      Alert.alert('Error', 'Please enter valid 6-digit pincode');
+      return;
+    }
+
+    setCheckingPincode(true);
+    try {
+      const response = await pincodeAPI.check(pincode);
+      
+      if (response.data.serviceable) {
+        setPincodeValid(true);
+        await setPincodeChecked(true, pincode);
+        Alert.alert('Success', `We deliver to ${response.data.area || 'your area'}!`);
+      } else {
+        setPincodeValid(false);
+        Alert.alert(
+          'Not Serviceable',
+          'Coming Soon in Your Area. We are expanding our service to your location.',
+          [
+            {
+              text: 'Request Service',
+              onPress: async () => {
+                try {
+                  await pincodeAPI.request({
+                    pincode,
+                    customerPhone: customer?.phone || phone,
+                  });
+                  Alert.alert('Request Submitted', 'We will notify you when service is available.');
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to submit request');
+                }
+              },
+            },
+            { text: 'Try Another Pincode', style: 'cancel' },
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to check pincode');
+    } finally {
+      setCheckingPincode(false);
     }
   };
 
@@ -76,6 +128,11 @@ export default function Checkout() {
   };
 
   const handlePlaceOrder = async () => {
+    if (!pincodeValid) {
+      Alert.alert('Pincode Required', 'Please verify your delivery pincode first');
+      return;
+    }
+
     if (!name || !phone || !fullAddress || !area || !pincode) {
       Alert.alert('Error', 'Please fill all address fields');
       return;
@@ -198,14 +255,42 @@ export default function Checkout() {
             value={landmark}
             onChangeText={setLandmark}
           />
-          <TextInput
-            style={styles.input}
-            placeholder="Pincode *"
-            value={pincode}
-            onChangeText={setPincode}
-            keyboardType="number-pad"
-            maxLength={6}
-          />
+          <View style={styles.pincodeRow}>
+            <TextInput
+              style={[styles.input, styles.pincodeInput]}
+              placeholder="Pincode *"
+              value={pincode}
+              onChangeText={(text) => {
+                setPincode(text);
+                setPincodeValid(false);
+              }}
+              keyboardType="number-pad"
+              maxLength={6}
+            />
+            <TouchableOpacity
+              style={[
+                styles.checkPincodeButton,
+                pincodeValid && styles.checkPincodeButtonValid,
+              ]}
+              onPress={handleCheckPincode}
+              disabled={checkingPincode}
+            >
+              {checkingPincode ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons
+                    name={pincodeValid ? 'checkmark-circle' : 'search'}
+                    size={18}
+                    color="#fff"
+                  />
+                  <Text style={styles.checkPincodeButtonText}>
+                    {pincodeValid ? 'Verified' : 'Check'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Delivery Slot */}
@@ -362,6 +447,32 @@ const styles = StyleSheet.create({
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  pincodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pincodeInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  checkPincodeButton: {
+    backgroundColor: '#e63946',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 6,
+  },
+  checkPincodeButtonValid: {
+    backgroundColor: '#4CAF50',
+  },
+  checkPincodeButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   slotChip: {
     flexDirection: 'row',
