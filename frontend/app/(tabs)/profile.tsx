@@ -43,7 +43,7 @@ export default function Profile() {
       icon: 'person-outline',
       title: 'Edit Profile',
       subtitle: 'Update your name and details',
-      onPress: () => {},
+      onPress: () => router.push('/edit-profile'),
     },
     {
       icon: 'location-outline',

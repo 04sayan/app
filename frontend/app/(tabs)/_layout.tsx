@@ -15,7 +15,8 @@ function TabBarBadge({ count }: { count: number }) {
 }
 
 export default function TabsLayout() {
-  const itemCount = useCartStore((state) => state.getItemCount());
+  const items = useCartStore((state) => state.items);
+  const itemCount = items.reduce((count, item) => count + item.quantity, 0);
 
   return (
     <Tabs

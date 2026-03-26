@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { orderAPI, slotAPI } from '../utils/api';
+import { orderAPI, slotAPI, pincodeAPI } from '../utils/api';
 import { useAuthStore } from '../store/authStore';
 import { useCartStore } from '../store/cartStore';
 import Header from '../components/Header';
