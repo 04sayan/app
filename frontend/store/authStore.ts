@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from '../utils/storage';
 
 interface Customer {
   _id: string;
@@ -25,44 +25,66 @@ export const useAuthStore = create<AuthState>((set) => ({
   servicePincode: null,
   
   setCustomer: async (customer) => {
-    if (customer) {
-      await AsyncStorage.setItem('customer', JSON.stringify(customer));
-      set({ customer, isAuthenticated: true });
-    } else {
-      await AsyncStorage.removeItem('customer');
-      set({ customer: null, isAuthenticated: false });
+    try {
+      if (customer) {
+        await storage.setItem('customer', JSON.stringify(customer));
+        set({ customer, isAuthenticated: true });
+      } else {
+        await storage.removeItem('customer');
+        set({ customer: null, isAuthenticated: false });
+      }
+    } catch (error) {
+      console.error('setCustomer error:', error);
     }
   },
   
   setPincodeChecked: async (checked, pincode) => {
-    if (checked && pincode) {
-      await AsyncStorage.setItem('pincode', pincode);
-      set({ pincodeChecked: true, servicePincode: pincode });
-    } else {
-      await AsyncStorage.removeItem('pincode');
-      set({ pincodeChecked: false, servicePincode: null });
+    try {
+      if (checked && pincode) {
+        await storage.setItem('pincode', pincode);
+        set({ pincodeChecked: true, servicePincode: pincode });
+      } else {
+        await storage.removeItem('pincode');
+        set({ pincodeChecked: false, servicePincode: null });
+      }
+    } catch (error) {
+      console.error('setPincodeChecked error:', error);
     }
   },
   
   logout: async () => {
-    await AsyncStorage.multiRemove(['customer', 'pincode', 'cart']);
-    set({ customer: null, isAuthenticated: false, pincodeChecked: false, servicePincode: null });
+    try {
+      await storage.removeItem('customer');
+      await storage.removeItem('pincode');
+      await storage.removeItem('cart');
+      set({ customer: null, isAuthenticated: false, pincodeChecked: false, servicePincode: null });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   },
   
   loadAuth: async () => {
     try {
-      const [customerStr, pincode] = await AsyncStorage.multiGet(['customer', 'pincode']);
+      const customerStr = await storage.getItem('customer');
+      const pincode = await storage.getItem('pincode');
       
-      if (customerStr[1]) {
-        const customer = JSON.parse(customerStr[1]);
-        set({ customer, isAuthenticated: true });
+      if (customerStr) {
+        try {
+          const customer = JSON.parse(customerStr);
+          set({ customer, isAuthenticated: true });
+        } catch (e) {
+          console.error('Failed to parse customer data:', e);
+          await storage.removeItem('customer');
+        }
       }
       
-      if (pincode[1]) {
-        set({ pincodeChecked: true, servicePincode: pincode[1] });
+      if (pincode) {
+        set({ pincodeChecked: true, servicePincode: pincode });
       }
     } catch (error) {
       console.error('Failed to load auth:', error);
+      // Set default state if storage fails
+      set({ customer: null, isAuthenticated: false, pincodeChecked: false, servicePincode: null });
     }
   },
 }));
