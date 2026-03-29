@@ -635,8 +635,18 @@ async def update_slot(slot_id: str, slot: DeliverySlot):
 @api_router.post("/admin/login")
 async def admin_login(username: str = Body(...), password: str = Body(...)):
     """Admin login with hardcoded credentials"""
-    # Hardcoded credentials for MVP
-    if username == "admin" and password == "hatbajar2025":
+    # Check custom password first
+    custom_admin = await db.adminSettings.find_one({"key": "admin_password"})
+    
+    if custom_admin and username == "admin" and password == custom_admin.get("value"):
+        return {
+            "success": True,
+            "token": "admin_mock_token",
+            "admin": {"username": "admin", "role": "admin"}
+        }
+    
+    # Fallback to default credentials
+    if username == "admin" and password == "admin.1":
         return {
             "success": True,
             "token": "admin_mock_token",
@@ -685,6 +695,30 @@ async def get_pincode_requests():
     """Get all pincode requests [Admin]"""
     requests = await db.pincodeRequests.find().sort("createdAt", -1).to_list(1000)
     return [serialize_doc(r) for r in requests]
+
+@api_router.post("/admin/change-password")
+async def change_admin_password(current_password: str = Body(...), new_password: str = Body(...)):
+    """Change admin password"""
+    # Verify current password
+    custom_admin = await db.adminSettings.find_one({"key": "admin_password"})
+    current_correct = False
+    
+    if custom_admin:
+        current_correct = current_password == custom_admin.get("value")
+    else:
+        current_correct = current_password == "admin.1"
+    
+    if not current_correct:
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Update password
+    await db.adminSettings.update_one(
+        {"key": "admin_password"},
+        {"$set": {"value": new_password}},
+        upsert=True
+    )
+    
+    return {"success": True, "message": "Password changed successfully"}
 
 # ============== ROOT ENDPOINT ==============
 

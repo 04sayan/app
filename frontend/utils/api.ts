@@ -88,6 +88,8 @@ export const adminAPI = {
   getSettings: () => api.get('/admin/settings'),
   updateSetting: (key: string, value: any) => 
     api.put('/admin/settings', { key, value }),
+  changePassword: (current_password: string, new_password: string) =>
+    api.post('/admin/change-password', { current_password, new_password }),
 };
 
 export default api;

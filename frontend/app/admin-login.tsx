@@ -38,7 +38,7 @@ export default function AdminLogin() {
         ]);
       }
     } catch (error) {
-      Alert.alert('Error', 'Invalid credentials\n\nDefault: admin / hatbajar2025');
+      Alert.alert('Error', 'Invalid credentials\n\nDefault: admin / admin.1');
     } finally {
       setLoading(false);
     }
@@ -106,7 +106,7 @@ export default function AdminLogin() {
             <View style={styles.credentialsHint}>
               <Ionicons name="information-circle-outline" size={16} color="#999" />
               <Text style={styles.hintText}>
-                Default: admin / hatbajar2025
+                Default: admin / admin.1
               </Text>
             </View>
           </View>

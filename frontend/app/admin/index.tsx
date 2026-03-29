@@ -27,6 +27,38 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert('Error', 'Please fill all fields');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      Alert.alert('Error', 'Password must be at least 4 characters');
+      return;
+    }
+
+    try {
+      await adminAPI.changePassword(currentPassword, newPassword);
+      Alert.alert('Success', 'Password changed successfully');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowChangePassword(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to change password');
+    }
+  };
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -42,7 +74,7 @@ export default function Admin() {
         loadOrders();
       }
     } catch (error) {
-      Alert.alert('Error', 'Invalid credentials. Use: admin / hatbajar2025');
+      Alert.alert('Error', 'Invalid credentials. Use: admin / admin.1');
     } finally {
       setLoginLoading(false);
     }
@@ -125,12 +157,22 @@ export default function Admin() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Header
-        title="Admin Panel"
-        showBack
-        rightAction={() => setIsLoggedIn(false)}
-        rightIcon="log-out-outline"
-      />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        
+        <Text style={styles.title}>Admin Panel</Text>
+        
+        <View style={styles.rightActions}>
+          <TouchableOpacity onPress={() => setShowChangePassword(true)} style={styles.iconButton}>
+            <Ionicons name="settings-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setIsLoggedIn(false)} style={styles.iconButton}>
+            <Ionicons name="log-out-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Status Filter */}
       <View style={styles.filterContainer}>
