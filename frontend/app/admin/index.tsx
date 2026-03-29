@@ -13,7 +13,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { adminAPI, orderAPI, productAPI, pincodeAPI } from '../../utils/api';
-import { storage } from '../../utils/storage';
 import * as ImagePicker from 'expo-image-picker';
 
 type Tab = 'dashboard' | 'orders' | 'products' | 'customers' | 'pincodes' | 'settings';
@@ -23,25 +22,7 @@ export default function AdminMain() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-
-  // Check if admin is already logged in
-  useEffect(() => {
-    const checkAdminAuth = async () => {
-      try {
-        const adminSession = await storage.getItem('adminSession');
-        if (adminSession) {
-          setIsLoggedIn(true);
-        }
-      } catch (error) {
-        console.error('Failed to check admin auth:', error);
-      } finally {
-        setCheckingAuth(false);
-      }
-    };
-    checkAdminAuth();
-  }, []);
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -53,11 +34,6 @@ export default function AdminMain() {
     try {
       const response = await adminAPI.login(username, password);
       if (response.data.success) {
-        await storage.setItem('adminSession', JSON.stringify({
-          username,
-          token: response.data.token,
-          timestamp: Date.now(),
-        }));
         setIsLoggedIn(true);
       }
     } catch (error: any) {
@@ -70,8 +46,7 @@ export default function AdminMain() {
     }
   };
 
-  const handleLogout = async () => {
-    await storage.removeItem('adminSession');
+  const handleLogout = () => {
     setIsLoggedIn(false);
     setUsername('');
     setPassword('');
@@ -85,16 +60,6 @@ export default function AdminMain() {
     { id: 'pincodes' as Tab, icon: 'location-outline', label: 'Pincodes' },
     { id: 'settings' as Tab, icon: 'settings-outline', label: 'Settings' },
   ];
-
-  if (checkingAuth) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#e63946" />
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   if (!isLoggedIn) {
     return (
