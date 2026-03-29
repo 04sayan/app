@@ -12,10 +12,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { adminAPI, orderAPI, productAPI, couponAPI, pincodeAPI } from '../../utils/api';
+import { adminAPI, orderAPI, productAPI, pincodeAPI } from '../../utils/api';
 import { storage } from '../../utils/storage';
+import * as ImagePicker from 'expo-image-picker';
 
-type Tab = 'dashboard' | 'orders' | 'products' | 'customers' | 'coupons' | 'pincodes' | 'settings';
+type Tab = 'dashboard' | 'orders' | 'products' | 'customers' | 'pincodes' | 'settings';
 
 export default function AdminMain() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -81,8 +82,8 @@ export default function AdminMain() {
     { id: 'orders' as Tab, icon: 'list-outline', label: 'Orders' },
     { id: 'products' as Tab, icon: 'cube-outline', label: 'Products' },
     { id: 'customers' as Tab, icon: 'people-outline', label: 'Customers' },
-    { id: 'coupons' as Tab, icon: 'pricetag-outline', label: 'Coupons' },
     { id: 'pincodes' as Tab, icon: 'location-outline', label: 'Pincodes' },
+    { id: 'settings' as Tab, icon: 'settings-outline', label: 'Settings' },
   ];
 
   if (checkingAuth) {
@@ -172,8 +173,8 @@ export default function AdminMain() {
         {activeTab === 'orders' && <OrdersTab />}
         {activeTab === 'products' && <ProductsTab />}
         {activeTab === 'customers' && <CustomersTab />}
-        {activeTab === 'coupons' && <CouponsTab />}
         {activeTab === 'pincodes' && <PincodesTab />}
+        {activeTab === 'settings' && <SettingsTab />}
       </View>
     </SafeAreaView>
   );
@@ -340,25 +341,375 @@ function OrdersTab() {
   );
 }
 
-// Products Tab (Simplified - basic list)
+// Products Tab - Full CRUD
 function ProductsTab() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    name: '',
+    category: '',
+    shortDescription: '',
+    fullDescription: '',
+    productType: 'weight', // 'weight' or 'pack'
+    basePrice: '',
+    inStock: true,
+    images: [] as string[],
+  });
+  
+  const [weightOptions, setWeightOptions] = useState([
+    { value: '250g', price: '', enabled: false },
+    { value: '500g', price: '', enabled: false },
+    { value: '750g', price: '', enabled: false },
+    { value: '1kg', price: '', enabled: false },
+  ]);
+  
+  const [packOptions, setPackOptions] = useState([
+    { value: '6 pieces', price: '', enabled: false },
+    { value: '12 pieces', price: '', enabled: false },
+    { value: 'tray', price: '', enabled: false },
+  ]);
 
   useEffect(() => {
     loadProducts();
   }, []);
 
   const loadProducts = async () => {
+    setLoading(true);
     try {
       const response = await productAPI.getAll({});
       setProducts(response.data);
     } catch (error) {
-      console.error('Failed to load products');
+      Alert.alert('Error', 'Failed to load products');
     } finally {
       setLoading(false);
     }
   };
+
+  const openAddForm = () => {
+    setEditingProduct(null);
+    setFormData({
+      name: '',
+      category: '',
+      shortDescription: '',
+      fullDescription: '',
+      productType: 'weight',
+      basePrice: '',
+      inStock: true,
+      images: [],
+    });
+    setWeightOptions([
+      { value: '250g', price: '', enabled: false },
+      { value: '500g', price: '', enabled: false },
+      { value: '750g', price: '', enabled: false },
+      { value: '1kg', price: '', enabled: false },
+    ]);
+    setPackOptions([
+      { value: '6 pieces', price: '', enabled: false },
+      { value: '12 pieces', price: '', enabled: false },
+      { value: 'tray', price: '', enabled: false },
+    ]);
+    setShowForm(true);
+  };
+
+  const openEditForm = (product: any) => {
+    setEditingProduct(product);
+    setFormData({
+      name: product.name,
+      category: product.category,
+      shortDescription: product.shortDescription || '',
+      fullDescription: product.fullDescription || '',
+      productType: product.productType || 'weight',
+      basePrice: product.basePrice?.toString() || '',
+      inStock: product.inStock,
+      images: product.images || [],
+    });
+    
+    // Load variants
+    if (product.variants && product.variants.length > 0) {
+      if (product.productType === 'weight') {
+        setWeightOptions(prev => prev.map(opt => {
+          const variant = product.variants.find((v: any) => v.value === opt.value);
+          return variant ? { ...opt, price: variant.price.toString(), enabled: true } : opt;
+        }));
+      } else {
+        setPackOptions(prev => prev.map(opt => {
+          const variant = product.variants.find((v: any) => v.value === opt.value);
+          return variant ? { ...opt, price: variant.price.toString(), enabled: true } : opt;
+        }));
+      }
+    }
+    
+    setShowForm(true);
+  };
+
+  const pickImages = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets) {
+        const base64Images = result.assets.map(asset => `data:image/jpeg;base64,${asset.base64}`);
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, ...base64Images].slice(0, 5),
+        }));
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick images');
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index),
+    }));
+  };
+
+  const saveProduct = async () => {
+    if (!formData.name || !formData.category) {
+      Alert.alert('Error', 'Please fill required fields');
+      return;
+    }
+
+    const variants = formData.productType === 'weight'
+      ? weightOptions.filter(o => o.enabled).map(o => ({ value: o.value, price: parseFloat(o.price) }))
+      : packOptions.filter(o => o.enabled).map(o => ({ value: o.value, price: parseFloat(o.price) }));
+
+    const productData = {
+      ...formData,
+      basePrice: parseFloat(formData.basePrice) || 0,
+      variants,
+    };
+
+    try {
+      if (editingProduct) {
+        await productAPI.update(editingProduct._id, productData);
+        Alert.alert('Success', 'Product updated successfully');
+      } else {
+        await productAPI.create(productData);
+        Alert.alert('Success', 'Product added successfully');
+      }
+      setShowForm(false);
+      loadProducts();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save product');
+    }
+  };
+
+  const deleteProduct = (productId: string) => {
+    Alert.alert(
+      'Confirm Delete',
+      'Are you sure you want to delete this product?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await productAPI.delete(productId);
+              Alert.alert('Success', 'Product deleted');
+              loadProducts();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete product');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (showForm) {
+    return (
+      <ScrollView style={styles.tabContent}>
+        <View style={styles.formHeader}>
+          <TouchableOpacity onPress={() => setShowForm(false)}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.formTitle}>{editingProduct ? 'Edit Product' : 'Add Product'}</Text>
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Product Name *</Text>
+          <TextInput
+            style={styles.formInput}
+            value={formData.name}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
+            placeholder="e.g., Fresh Chicken"
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Category *</Text>
+          <TextInput
+            style={styles.formInput}
+            value={formData.category}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, category: text }))}
+            placeholder="e.g., Chicken, Eggs"
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Short Description</Text>
+          <TextInput
+            style={styles.formInput}
+            value={formData.shortDescription}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, shortDescription: text }))}
+            placeholder="Brief description"
+            multiline
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Full Description</Text>
+          <TextInput
+            style={[styles.formInput, styles.textArea]}
+            value={formData.fullDescription}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, fullDescription: text }))}
+            placeholder="Detailed description"
+            multiline
+            numberOfLines={4}
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Product Type *</Text>
+          <View style={styles.radioGroup}>
+            <TouchableOpacity
+              style={[styles.radioBtn, formData.productType === 'weight' && styles.radioBtnActive]}
+              onPress={() => setFormData(prev => ({ ...prev, productType: 'weight' }))}
+            >
+              <Text style={[styles.radioBtnText, formData.productType === 'weight' && styles.radioBtnTextActive]}>
+                Weight-based
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.radioBtn, formData.productType === 'pack' && styles.radioBtnActive]}
+              onPress={() => setFormData(prev => ({ ...prev, productType: 'pack' }))}
+            >
+              <Text style={[styles.radioBtnText, formData.productType === 'pack' && styles.radioBtnTextActive]}>
+                Pack-based
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Base Price (₹)</Text>
+          <TextInput
+            style={styles.formInput}
+            value={formData.basePrice}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, basePrice: text }))}
+            placeholder="0"
+            keyboardType="numeric"
+          />
+        </View>
+
+        {formData.productType === 'weight' && (
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Weight Options</Text>
+            {weightOptions.map((opt, idx) => (
+              <View key={idx} style={styles.variantRow}>
+                <TouchableOpacity
+                  onPress={() => setWeightOptions(prev => prev.map((o, i) => i === idx ? { ...o, enabled: !o.enabled } : o))}
+                  style={styles.checkbox}
+                >
+                  <Ionicons
+                    name={opt.enabled ? 'checkbox' : 'square-outline'}
+                    size={24}
+                    color={opt.enabled ? '#e63946' : '#999'}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.variantLabel}>{opt.value}</Text>
+                <TextInput
+                  style={[styles.variantInput, !opt.enabled && styles.variantInputDisabled]}
+                  value={opt.price}
+                  onChangeText={(text) => setWeightOptions(prev => prev.map((o, i) => i === idx ? { ...o, price: text } : o))}
+                  placeholder="Price"
+                  keyboardType="numeric"
+                  editable={opt.enabled}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+
+        {formData.productType === 'pack' && (
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Pack Options</Text>
+            {packOptions.map((opt, idx) => (
+              <View key={idx} style={styles.variantRow}>
+                <TouchableOpacity
+                  onPress={() => setPackOptions(prev => prev.map((o, i) => i === idx ? { ...o, enabled: !o.enabled } : o))}
+                  style={styles.checkbox}
+                >
+                  <Ionicons
+                    name={opt.enabled ? 'checkbox' : 'square-outline'}
+                    size={24}
+                    color={opt.enabled ? '#e63946' : '#999'}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.variantLabel}>{opt.value}</Text>
+                <TextInput
+                  style={[styles.variantInput, !opt.enabled && styles.variantInputDisabled]}
+                  value={opt.price}
+                  onChangeText={(text) => setPackOptions(prev => prev.map((o, i) => i === idx ? { ...o, price: text } : o))}
+                  placeholder="Price"
+                  keyboardType="numeric"
+                  editable={opt.enabled}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Stock Status</Text>
+          <TouchableOpacity
+            style={styles.switchRow}
+            onPress={() => setFormData(prev => ({ ...prev, inStock: !prev.inStock }))}
+          >
+            <Text style={styles.switchLabel}>{formData.inStock ? 'In Stock' : 'Out of Stock'}</Text>
+            <Ionicons
+              name={formData.inStock ? 'toggle' : 'toggle-outline'}
+              size={40}
+              color={formData.inStock ? '#4CAF50' : '#999'}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Product Images (up to 5)</Text>
+          <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImages}>
+            <Ionicons name="images-outline" size={24} color="#e63946" />
+            <Text style={styles.imagePickerText}>Add Images</Text>
+          </TouchableOpacity>
+          <View style={styles.imageGrid}>
+            {formData.images.map((img, idx) => (
+              <View key={idx} style={styles.imagePreview}>
+                <TouchableOpacity style={styles.imageRemoveBtn} onPress={() => removeImage(idx)}>
+                  <Ionicons name="close-circle" size={24} color="#ff0000" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.saveBtn} onPress={saveProduct}>
+          <Text style={styles.saveBtnText}>{editingProduct ? 'Update Product' : 'Add Product'}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
 
   if (loading) {
     return (
@@ -369,16 +720,37 @@ function ProductsTab() {
   }
 
   return (
-    <ScrollView style={styles.tabContent}>
-      <Text style={styles.sectionNote}>Product management coming soon</Text>
-      {products.map((product: any) => (
-        <View key={product._id} style={styles.productCard}>
-          <Text style={styles.productName}>{product.name}</Text>
-          <Text style={styles.productPrice}>₹{product.basePrice}</Text>
-          <Text style={styles.productStock}>{product.inStock ? 'In Stock' : 'Out of Stock'}</Text>
-        </View>
-      ))}
-    </ScrollView>
+    <View style={{ flex: 1 }}>
+      <TouchableOpacity style={styles.addBtn} onPress={openAddForm}>
+        <Ionicons name="add-circle-outline" size={24} color="#fff" />
+        <Text style={styles.addBtnText}>Add Product</Text>
+      </TouchableOpacity>
+
+      <ScrollView style={styles.tabContent}>
+        {products.map((product: any) => (
+          <View key={product._id} style={styles.productCard}>
+            <View style={styles.productHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.productName}>{product.name}</Text>
+                <Text style={styles.productCategory}>{product.category}</Text>
+                <Text style={styles.productPrice}>Base: ₹{product.basePrice}</Text>
+                <Text style={[styles.productStock, !product.inStock && styles.productOutOfStock]}>
+                  {product.inStock ? 'In Stock' : 'Out of Stock'}
+                </Text>
+              </View>
+              <View style={styles.productActions}>
+                <TouchableOpacity onPress={() => openEditForm(product)} style={styles.actionBtn}>
+                  <Ionicons name="create-outline" size={20} color="#4CAF50" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteProduct(product._id)} style={styles.actionBtn}>
+                  <Ionicons name="trash-outline" size={20} color="#ff0000" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -423,68 +795,78 @@ function CustomersTab() {
   );
 }
 
-// Coupons Tab
-function CouponsTab() {
-  const [coupons, setCoupons] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadCoupons();
-  }, []);
-
-  const loadCoupons = async () => {
-    try {
-      const response = await couponAPI.getAll();
-      setCoupons(response.data);
-    } catch (error) {
-      console.error('Failed to load coupons');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#e63946" />
-      </View>
-    );
-  }
-
-  return (
-    <ScrollView style={styles.tabContent}>
-      <Text style={styles.sectionNote}>Coupon management coming soon</Text>
-      {coupons.map((coupon: any) => (
-        <View key={coupon._id} style={styles.couponCard}>
-          <Text style={styles.couponCode}>{coupon.code}</Text>
-          <Text style={styles.couponValue}>
-            {coupon.discountType === 'percentage' ? `${coupon.discountValue}% off` : `₹${coupon.discountValue} off`}
-          </Text>
-          <Text style={styles.couponStatus}>{coupon.isActive ? 'Active' : 'Inactive'}</Text>
-        </View>
-      ))}
-    </ScrollView>
-  );
-}
-
-// Pincodes Tab
+// Pincodes Tab - Service Area Management
 function PincodesTab() {
   const [pincodes, setPincodes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newPincode, setNewPincode] = useState('');
+  const [newArea, setNewArea] = useState('');
 
   useEffect(() => {
     loadPincodes();
   }, []);
 
   const loadPincodes = async () => {
+    setLoading(true);
     try {
       const response = await pincodeAPI.getAll();
       setPincodes(response.data);
     } catch (error) {
-      console.error('Failed to load pincodes');
+      Alert.alert('Error', 'Failed to load pincodes');
     } finally {
       setLoading(false);
     }
+  };
+
+  const addPincode = async () => {
+    if (!newPincode || !newArea) {
+      Alert.alert('Error', 'Please fill all fields');
+      return;
+    }
+
+    try {
+      await pincodeAPI.create({ pincode: newPincode, area: newArea, isActive: true });
+      Alert.alert('Success', 'Pincode added successfully');
+      setNewPincode('');
+      setNewArea('');
+      setShowAddForm(false);
+      loadPincodes();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add pincode');
+    }
+  };
+
+  const togglePincode = async (id: string, currentStatus: boolean) => {
+    try {
+      await pincodeAPI.update(id, { isActive: !currentStatus });
+      loadPincodes();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update pincode');
+    }
+  };
+
+  const deletePincode = (id: string) => {
+    Alert.alert(
+      'Confirm Delete',
+      'Remove this service area?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await pincodeAPI.delete(id);
+              Alert.alert('Success', 'Pincode removed');
+              loadPincodes();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete pincode');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -496,15 +878,131 @@ function PincodesTab() {
   }
 
   return (
-    <ScrollView style={styles.tabContent}>
-      <Text style={styles.sectionNote}>Pincode management coming soon</Text>
-      {pincodes.map((pincode: any) => (
-        <View key={pincode._id} style={styles.pincodeCard}>
-          <Text style={styles.pincodeCode}>{pincode.pincode}</Text>
-          <Text style={styles.pincodeArea}>{pincode.area}</Text>
-          <Text style={styles.pincodeStatus}>{pincode.isActive ? 'Active' : 'Inactive'}</Text>
+    <View style={{ flex: 1 }}>
+      {showAddForm ? (
+        <View style={styles.addPincodeForm}>
+          <View style={styles.formHeader}>
+            <TouchableOpacity onPress={() => setShowAddForm(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.formTitle}>Add Service Area</Text>
+          </View>
+          <TextInput
+            style={styles.formInput}
+            placeholder="Pincode (e.g., 560001)"
+            value={newPincode}
+            onChangeText={setNewPincode}
+            keyboardType="numeric"
+          />
+          <TextInput
+            style={styles.formInput}
+            placeholder="Area Name (e.g., Bangalore Central)"
+            value={newArea}
+            onChangeText={setNewArea}
+          />
+          <TouchableOpacity style={styles.saveBtn} onPress={addPincode}>
+            <Text style={styles.saveBtnText}>Add Pincode</Text>
+          </TouchableOpacity>
         </View>
-      ))}
+      ) : (
+        <>
+          <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddForm(true)}>
+            <Ionicons name="add-circle-outline" size={24} color="#fff" />
+            <Text style={styles.addBtnText}>Add Pincode</Text>
+          </TouchableOpacity>
+
+          <ScrollView style={styles.tabContent}>
+            {pincodes.map((pincode: any) => (
+              <View key={pincode._id} style={styles.pincodeCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pincodeCode}>{pincode.pincode}</Text>
+                  <Text style={styles.pincodeArea}>{pincode.area}</Text>
+                  <Text style={[styles.pincodeStatus, !pincode.isActive && styles.pincodeInactive]}>
+                    {pincode.isActive ? 'Active' : 'Inactive'}
+                  </Text>
+                </View>
+                <View style={styles.pincodeActions}>
+                  <TouchableOpacity onPress={() => togglePincode(pincode._id, pincode.isActive)}>
+                    <Ionicons
+                      name={pincode.isActive ? 'toggle' : 'toggle-outline'}
+                      size={32}
+                      color={pincode.isActive ? '#4CAF50' : '#999'}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => deletePincode(pincode._id)} style={{ marginLeft: 12 }}>
+                    <Ionicons name="trash-outline" size={20} color="#ff0000" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </>
+      )}
+    </View>
+  );
+}
+
+// Settings Tab - Delivery Settings
+function SettingsTab() {
+  const [settings, setSettings] = useState({
+    ordersActive: true,
+    defaultDeliveryTime: '24 hours',
+    deliverySlots: ['9 AM - 12 PM', '12 PM - 3 PM', '3 PM - 6 PM', '6 PM - 9 PM'],
+  });
+
+  const toggleOrders = async () => {
+    setSettings(prev => ({ ...prev, ordersActive: !prev.ordersActive }));
+    Alert.alert('Success', settings.ordersActive ? 'Orders paused' : 'Orders resumed');
+  };
+
+  const updateDeliveryTime = (time: string) => {
+    setSettings(prev => ({ ...prev, defaultDeliveryTime: time }));
+  };
+
+  return (
+    <ScrollView style={styles.tabContent}>
+      <View style={styles.settingCard}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.settingTitle}>Accept New Orders</Text>
+          <Text style={styles.settingDesc}>
+            {settings.ordersActive ? 'Customers can place orders' : 'Order placement is paused'}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={toggleOrders}>
+          <Ionicons
+            name={settings.ordersActive ? 'toggle' : 'toggle-outline'}
+            size={40}
+            color={settings.ordersActive ? '#4CAF50' : '#999'}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.settingCard}>
+        <Text style={styles.settingTitle}>Default Delivery Time</Text>
+        <View style={styles.radioGroup}>
+          {['24 hours', '48 hours', 'Same day'].map(time => (
+            <TouchableOpacity
+              key={time}
+              style={[styles.radioBtn, settings.defaultDeliveryTime === time && styles.radioBtnActive]}
+              onPress={() => updateDeliveryTime(time)}
+            >
+              <Text style={[styles.radioBtnText, settings.defaultDeliveryTime === time && styles.radioBtnTextActive]}>
+                {time}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.settingCard}>
+        <Text style={styles.settingTitle}>Delivery Slots</Text>
+        {settings.deliverySlots.map((slot, idx) => (
+          <View key={idx} style={styles.slotRow}>
+            <Ionicons name="time-outline" size={20} color="#666" />
+            <Text style={styles.slotText}>{slot}</Text>
+          </View>
+        ))}
+      </View>
     </ScrollView>
   );
 }
@@ -805,6 +1303,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   pincodeCode: {
     fontSize: 16,
@@ -818,7 +1318,220 @@ const styles = StyleSheet.create({
   },
   pincodeStatus: {
     fontSize: 12,
-    color: '#999',
+    color: '#4CAF50',
     marginTop: 4,
+    fontWeight: '600',
+  },
+  pincodeInactive: {
+    color: '#999',
+  },
+  pincodeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addBtn: {
+    backgroundColor: '#e63946',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    margin: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  addBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  formHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    gap: 16,
+  },
+  formTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  radioGroup: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  radioBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  radioBtnActive: {
+    backgroundColor: '#e63946',
+    borderColor: '#e63946',
+  },
+  radioBtnText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '600',
+  },
+  radioBtnTextActive: {
+    color: '#fff',
+  },
+  variantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  checkbox: {
+    padding: 4,
+  },
+  variantLabel: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  variantInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    width: 100,
+  },
+  variantInputDisabled: {
+    backgroundColor: '#f5f5f5',
+    borderColor: '#e0e0e0',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
+  },
+  imagePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#e63946',
+    borderRadius: 8,
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  imagePickerText: {
+    fontSize: 14,
+    color: '#e63946',
+    fontWeight: '600',
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    position: 'relative',
+  },
+  imageRemoveBtn: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+  },
+  saveBtn: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  productHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  productCategory: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  productActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionBtn: {
+    padding: 8,
+  },
+  productOutOfStock: {
+    color: '#ff6b6b',
+  },
+  addPincodeForm: {
+    padding: 16,
+  },
+  settingCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  settingTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  settingDesc: {
+    fontSize: 13,
+    color: '#666',
+  },
+  slotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 12,
+  },
+  slotText: {
+    fontSize: 14,
+    color: '#333',
   },
 });
