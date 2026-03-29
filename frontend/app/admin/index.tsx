@@ -11,28 +11,19 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { adminAPI, orderAPI } from '../../utils/api';
-import Header from '../../components/Header';
+import { adminAPI, orderAPI, productAPI, couponAPI, pincodeAPI } from '../../utils/api';
 import { storage } from '../../utils/storage';
 
-export default function Admin() {
-  const router = useRouter();
+type Tab = 'dashboard' | 'orders' | 'products' | 'customers' | 'coupons' | 'pincodes' | 'settings';
+
+export default function AdminMain() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
 
   // Check if admin is already logged in
   useEffect(() => {
@@ -51,34 +42,6 @@ export default function Admin() {
     checkAdminAuth();
   }, []);
 
-  const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill all fields');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
-      return;
-    }
-
-    if (newPassword.length < 4) {
-      Alert.alert('Error', 'Password must be at least 4 characters');
-      return;
-    }
-
-    try {
-      await adminAPI.changePassword(currentPassword, newPassword);
-      Alert.alert('Success', 'Password changed successfully');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setShowChangePassword(false);
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to change password');
-    }
-  };
-
   const handleLogin = async () => {
     if (!username || !password) {
       Alert.alert('Error', 'Please enter username and password');
@@ -89,14 +52,12 @@ export default function Admin() {
     try {
       const response = await adminAPI.login(username, password);
       if (response.data.success) {
-        // Save admin session
         await storage.setItem('adminSession', JSON.stringify({
           username,
           token: response.data.token,
           timestamp: Date.now(),
         }));
         setIsLoggedIn(true);
-        loadOrders();
       }
     } catch (error: any) {
       Alert.alert(
@@ -108,26 +69,6 @@ export default function Admin() {
     }
   };
 
-  const loadOrders = async () => {
-    setLoading(true);
-    try {
-      const params = selectedStatus ? { status: selectedStatus } : {};
-      const response = await orderAPI.getAll(params);
-      setOrders(response.data);
-    } catch (error) {
-      console.error('Failed to load orders:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isLoggedIn) {
-      loadOrders();
-    }
-  }, [selectedStatus, isLoggedIn]);
-
   const handleLogout = async () => {
     await storage.removeItem('adminSession');
     setIsLoggedIn(false);
@@ -135,26 +76,20 @@ export default function Admin() {
     setPassword('');
   };
 
-  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
-    try {
-      await orderAPI.updateStatus(orderId, newStatus);
-      Alert.alert('Success', 'Order status updated');
-      loadOrders();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update status');
-    }
-  };
+  const tabs = [
+    { id: 'dashboard' as Tab, icon: 'grid-outline', label: 'Dashboard' },
+    { id: 'orders' as Tab, icon: 'list-outline', label: 'Orders' },
+    { id: 'products' as Tab, icon: 'cube-outline', label: 'Products' },
+    { id: 'customers' as Tab, icon: 'people-outline', label: 'Customers' },
+    { id: 'coupons' as Tab, icon: 'pricetag-outline', label: 'Coupons' },
+    { id: 'pincodes' as Tab, icon: 'location-outline', label: 'Pincodes' },
+  ];
 
-  const statuses = ['Pending', 'Accepted', 'Preparing', 'OutForDelivery', 'Delivered'];
-  const filterStatuses = [null, 'Pending', 'Accepted', 'Preparing', 'OutForDelivery', 'Delivered', 'Cancelled'];
-
-  // Show loading while checking authentication
   if (checkingAuth) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#e63946" />
-          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
     );
@@ -162,8 +97,7 @@ export default function Admin() {
 
   if (!isLoggedIn) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <Header title="Admin Login" showBack />
+      <SafeAreaView style={styles.container}>
         <View style={styles.loginContainer}>
           <View style={styles.loginCard}>
             <Ionicons name="shield-checkmark" size={64} color="#e63946" />
@@ -193,9 +127,7 @@ export default function Admin() {
               </TouchableOpacity>
             )}
 
-            <Text style={styles.hintText}>
-              Default: admin / admin.1
-            </Text>
+            <Text style={styles.hintText}>Default: admin / admin.1</Text>
           </View>
         </View>
       </SafeAreaView>
@@ -203,122 +135,377 @@ export default function Admin() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
+        <Text style={styles.headerTitle}>Hatbajar Admin</Text>
+        <TouchableOpacity onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={24} color="#fff" />
         </TouchableOpacity>
-        
-        <Text style={styles.title}>Admin Panel</Text>
-        
-        <View style={styles.rightActions}>
-          <TouchableOpacity onPress={() => setShowChangePassword(true)} style={styles.iconButton}>
-            <Ionicons name="settings-outline" size={24} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout} style={styles.iconButton}>
-            <Ionicons name="log-out-outline" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
       </View>
 
-      {/* Status Filter */}
-      <View style={styles.filterContainer}>
+      {/* Tab Navigation */}
+      <View style={styles.tabNav}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {filterStatuses.map((status) => (
+          {tabs.map((tab) => (
             <TouchableOpacity
-              key={status || 'all'}
-              style={[
-                styles.filterChip,
-                selectedStatus === status && styles.filterChipActive,
-              ]}
-              onPress={() => setSelectedStatus(status)}
+              key={tab.id}
+              style={[styles.tab, activeTab === tab.id && styles.tabActive]}
+              onPress={() => setActiveTab(tab.id)}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  selectedStatus === status && styles.filterChipTextActive,
-                ]}
-              >
-                {status || 'All'}
+              <Ionicons
+                name={tab.icon as any}
+                size={20}
+                color={activeTab === tab.id ? '#e63946' : '#666'}
+              />
+              <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
+                {tab.label}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      {/* Orders List */}
+      {/* Content */}
+      <View style={styles.content}>
+        {activeTab === 'dashboard' && <DashboardTab />}
+        {activeTab === 'orders' && <OrdersTab />}
+        {activeTab === 'products' && <ProductsTab />}
+        {activeTab === 'customers' && <CustomersTab />}
+        {activeTab === 'coupons' && <CouponsTab />}
+        {activeTab === 'pincodes' && <PincodesTab />}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+// Dashboard Tab
+function DashboardTab() {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    newOrders: 0,
+    activeOrders: 0,
+    deliveredOrders: 0,
+    totalProducts: 0,
+  });
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      const [ordersRes, productsRes] = await Promise.all([
+        orderAPI.getAll({}),
+        productAPI.getAll({}),
+      ]);
+
+      const orders = ordersRes.data;
+      setStats({
+        newOrders: orders.filter((o: any) => o.status === 'Pending').length,
+        activeOrders: orders.filter((o: any) => 
+          ['Accepted', 'Preparing', 'OutForDelivery'].includes(o.status)
+        ).length,
+        deliveredOrders: orders.filter((o: any) => o.status === 'Delivered').length,
+        totalProducts: productsRes.data.length,
+      });
+    } catch (error) {
+      console.error('Failed to load stats');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#e63946" />
+      </View>
+    );
+  }
+
+  const statCards = [
+    { title: 'New Orders', value: stats.newOrders, icon: 'notifications', color: '#ff6b6b' },
+    { title: 'Active Orders', value: stats.activeOrders, icon: 'time', color: '#ffa500' },
+    { title: 'Delivered', value: stats.deliveredOrders, icon: 'checkmark-circle', color: '#4CAF50' },
+    { title: 'Products', value: stats.totalProducts, icon: 'cube', color: '#e63946' },
+  ];
+
+  return (
+    <ScrollView style={styles.tabContent}>
+      <View style={styles.statsGrid}>
+        {statCards.map((card, index) => (
+          <View key={index} style={[styles.statCard, { borderLeftColor: card.color }]}>
+            <Ionicons name={card.icon as any} size={32} color={card.color} />
+            <Text style={styles.statValue}>{card.value}</Text>
+            <Text style={styles.statTitle}>{card.title}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+// Orders Tab
+function OrdersTab() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadOrders();
+  }, [selectedStatus]);
+
+  const loadOrders = async () => {
+    setLoading(true);
+    try {
+      const params = selectedStatus ? { status: selectedStatus } : {};
+      const response = await orderAPI.getAll(params);
+      setOrders(response.data);
+    } catch (error) {
+      console.error('Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStatus = async (orderId: string, newStatus: string) => {
+    try {
+      await orderAPI.updateStatus(orderId, newStatus);
+      Alert.alert('Success', 'Order status updated');
+      loadOrders();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update status');
+    }
+  };
+
+  const statuses = ['Pending', 'Accepted', 'Preparing', 'OutForDelivery', 'Delivered'];
+  const filterStatuses = [null, ...statuses, 'Cancelled'];
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+        {filterStatuses.map((status) => (
+          <TouchableOpacity
+            key={status || 'all'}
+            style={[styles.filterChip, selectedStatus === status && styles.filterChipActive]}
+            onPress={() => setSelectedStatus(status)}
+          >
+            <Text style={[styles.filterText, selectedStatus === status && styles.filterTextActive]}>
+              {status || 'All'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       {loading ? (
-        <View style={styles.loadingContainer}>
+        <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#e63946" />
         </View>
       ) : (
-        <ScrollView
-          style={styles.scrollView}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => {
-              setRefreshing(true);
-              loadOrders();
-            }} colors={['#e63946']} />
-          }
-        >
-          {orders.length > 0 ? (
-            orders.map((order: any) => (
-              <View key={order._id} style={styles.orderCard}>
-                <View style={styles.orderHeader}>
-                  <Text style={styles.orderId}>#{order.orderId}</Text>
-                  <Text style={styles.orderAmount}>₹{order.totalAmount}</Text>
-                </View>
-
-                <View style={styles.orderDetails}>
-                  <Text style={styles.customerName}>{order.customerName}</Text>
-                  <Text style={styles.customerPhone}>{order.customerPhone}</Text>
-                  <Text style={styles.orderDate}>
-                    {new Date(order.createdAt).toLocaleString()}
-                  </Text>
-                </View>
-
-                <View style={styles.orderItems}>
-                  {order.items.map((item: any, index: number) => (
-                    <Text key={index} style={styles.itemText}>
-                      • {item.productName} {item.variant && `(${item.variant.value})`} x{item.quantity}
-                    </Text>
-                  ))}
-                </View>
-
-                <View style={styles.statusSection}>
-                  <Text style={styles.statusLabel}>Update Status:</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {statuses.map((status) => (
-                      <TouchableOpacity
-                        key={status}
-                        style={[
-                          styles.statusButton,
-                          order.status === status && styles.statusButtonActive,
-                        ]}
-                        onPress={() => handleUpdateStatus(order.orderId, status)}
-                      >
-                        <Text
-                          style={[
-                            styles.statusButtonText,
-                            order.status === status && styles.statusButtonTextActive,
-                          ]}
-                        >
-                          {status.replace(/([A-Z])/g, ' $1').trim()}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
+        <ScrollView style={styles.tabContent}>
+          {orders.map((order: any) => (
+            <View key={order._id} style={styles.orderCard}>
+              <View style={styles.orderHeader}>
+                <Text style={styles.orderId}>#{order.orderId}</Text>
+                <Text style={styles.orderAmount}>₹{order.totalAmount}</Text>
               </View>
-            ))
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No orders found</Text>
+              <Text style={styles.orderCustomer}>{order.customerName}</Text>
+              <Text style={styles.orderPhone}>{order.customerPhone}</Text>
+              <View style={styles.orderItems}>
+                {order.items.map((item: any, idx: number) => (
+                  <Text key={idx} style={styles.itemText}>
+                    • {item.productName} {item.variant?.value} x{item.quantity}
+                  </Text>
+                ))}
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRow}>
+                {statuses.map((status) => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[styles.statusBtn, order.status === status && styles.statusBtnActive]}
+                    onPress={() => updateStatus(order.orderId, status)}
+                  >
+                    <Text style={[styles.statusBtnText, order.status === status && styles.statusBtnTextActive]}>
+                      {status}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-          )}
+          ))}
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
+  );
+}
+
+// Products Tab (Simplified - basic list)
+function ProductsTab() {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      const response = await productAPI.getAll({});
+      setProducts(response.data);
+    } catch (error) {
+      console.error('Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#e63946" />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.tabContent}>
+      <Text style={styles.sectionNote}>Product management coming soon</Text>
+      {products.map((product: any) => (
+        <View key={product._id} style={styles.productCard}>
+          <Text style={styles.productName}>{product.name}</Text>
+          <Text style={styles.productPrice}>₹{product.basePrice}</Text>
+          <Text style={styles.productStock}>{product.inStock ? 'In Stock' : 'Out of Stock'}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// Customers Tab
+function CustomersTab() {
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  const loadCustomers = async () => {
+    try {
+      const response = await adminAPI.getCustomers();
+      setCustomers(response.data);
+    } catch (error) {
+      console.error('Failed to load customers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#e63946" />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.tabContent}>
+      {customers.map((customer: any) => (
+        <View key={customer._id} style={styles.customerCard}>
+          <Text style={styles.customerName}>{customer.name || 'No Name'}</Text>
+          <Text style={styles.customerPhone}>{customer.phone}</Text>
+          <Text style={styles.customerOrders}>{customer.orderCount || 0} orders</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// Coupons Tab
+function CouponsTab() {
+  const [coupons, setCoupons] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadCoupons();
+  }, []);
+
+  const loadCoupons = async () => {
+    try {
+      const response = await couponAPI.getAll();
+      setCoupons(response.data);
+    } catch (error) {
+      console.error('Failed to load coupons');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#e63946" />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.tabContent}>
+      <Text style={styles.sectionNote}>Coupon management coming soon</Text>
+      {coupons.map((coupon: any) => (
+        <View key={coupon._id} style={styles.couponCard}>
+          <Text style={styles.couponCode}>{coupon.code}</Text>
+          <Text style={styles.couponValue}>
+            {coupon.discountType === 'percentage' ? `${coupon.discountValue}% off` : `₹${coupon.discountValue} off`}
+          </Text>
+          <Text style={styles.couponStatus}>{coupon.isActive ? 'Active' : 'Inactive'}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// Pincodes Tab
+function PincodesTab() {
+  const [pincodes, setPincodes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadPincodes();
+  }, []);
+
+  const loadPincodes = async () => {
+    try {
+      const response = await pincodeAPI.getAll();
+      setPincodes(response.data);
+    } catch (error) {
+      console.error('Failed to load pincodes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#e63946" />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.tabContent}>
+      <Text style={styles.sectionNote}>Pincode management coming soon</Text>
+      {pincodes.map((pincode: any) => (
+        <View key={pincode._id} style={styles.pincodeCard}>
+          <Text style={styles.pincodeCode}>{pincode.pincode}</Text>
+          <Text style={styles.pincodeArea}>{pincode.area}</Text>
+          <Text style={styles.pincodeStatus}>{pincode.isActive ? 'Active' : 'Inactive'}</Text>
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -326,6 +513,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loginContainer: {
     flex: 1,
@@ -337,11 +529,6 @@ const styles = StyleSheet.create({
     padding: 32,
     borderRadius: 16,
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
   },
   loginTitle: {
     fontSize: 24,
@@ -384,10 +571,84 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 16,
   },
-  filterContainer: {
-    backgroundColor: '#fff',
-    paddingVertical: 12,
+  header: {
+    backgroundColor: '#e63946',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  tabNav: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#e63946',
+  },
+  tabLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  tabLabelActive: {
+    color: '#e63946',
+    fontWeight: 'bold',
+  },
+  content: {
+    flex: 1,
+  },
+  tabContent: {
+    flex: 1,
+    padding: 16,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    width: '47%',
+    borderLeftWidth: 4,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 8,
+  },
+  statTitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  filterRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
   },
   filterChip: {
     paddingHorizontal: 16,
@@ -399,148 +660,165 @@ const styles = StyleSheet.create({
   filterChipActive: {
     backgroundColor: '#e63946',
   },
-  filterChipText: {
+  filterText: {
     fontSize: 13,
-    fontWeight: '600',
     color: '#666',
+    fontWeight: '600',
   },
-  filterChipTextActive: {
+  filterTextActive: {
     color: '#fff',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollView: {
-    flex: 1,
   },
   orderCard: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 12,
-    padding: 16,
     borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    padding: 16,
+    marginBottom: 12,
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   orderId: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
   },
   orderAmount: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#e63946',
   },
-  orderDetails: {
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  customerName: {
-    fontSize: 15,
+  orderCustomer: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
   },
-  customerPhone: {
+  orderPhone: {
     fontSize: 13,
     color: '#666',
     marginTop: 2,
   },
-  orderDate: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
-  },
   orderItems: {
+    marginTop: 8,
     marginBottom: 12,
   },
   itemText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#666',
     marginBottom: 4,
   },
-  statusSection: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+  statusRow: {
+    flexDirection: 'row',
+    marginTop: 8,
   },
-  statusLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  statusButton: {
+  statusBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
     backgroundColor: '#f0f0f0',
     marginRight: 8,
   },
-  statusButtonActive: {
+  statusBtnActive: {
     backgroundColor: '#e63946',
   },
-  statusButtonText: {
+  statusBtnText: {
     fontSize: 11,
-    fontWeight: '600',
     color: '#666',
+    fontWeight: '600',
   },
-  statusButtonTextActive: {
+  statusBtnTextActive: {
     color: '#fff',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 16,
+  sectionNote: {
+    fontSize: 14,
     color: '#999',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontStyle: 'italic',
   },
-  loadingText: {
+  productCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  productPrice: {
+    fontSize: 14,
+    color: '#e63946',
+    marginTop: 4,
+  },
+  productStock: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  customerCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  customerName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  customerPhone: {
     fontSize: 14,
     color: '#666',
-    marginTop: 12,
+    marginTop: 4,
   },
-  iconButton: {
-    padding: 8,
-    marginLeft: 8,
+  customerOrders: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
   },
-  header: {
-    backgroundColor: '#e63946',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  couponCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
   },
-  backButton: {
-    padding: 4,
-  },
-  title: {
-    fontSize: 20,
+  couponCode: {
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
-    flex: 1,
-    marginLeft: 12,
+    color: '#333',
   },
-  rightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  couponValue: {
+    fontSize: 14,
+    color: '#e63946',
+    marginTop: 4,
+  },
+  couponStatus: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  pincodeCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  pincodeCode: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  pincodeArea: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  pincodeStatus: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
   },
 });
