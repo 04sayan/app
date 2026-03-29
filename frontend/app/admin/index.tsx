@@ -139,15 +139,15 @@ export default function AdminMain() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Hatbajar Admin</Text>
+        <Text style={styles.headerTitle}>🏪 Hatbajar Admin</Text>
         <TouchableOpacity onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation - MVP Admin Sections */}
       <View style={styles.tabNav}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 8 }}>
           {tabs.map((tab) => (
             <TouchableOpacity
               key={tab.id}
@@ -156,7 +156,7 @@ export default function AdminMain() {
             >
               <Ionicons
                 name={tab.icon as any}
-                size={20}
+                size={22}
                 color={activeTab === tab.id ? '#e63946' : '#666'}
               />
               <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
@@ -1084,25 +1084,28 @@ const styles = StyleSheet.create({
   },
   tabNav: {
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomWidth: 2,
+    borderBottomColor: '#ddd',
+    paddingVertical: 4,
   },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 6,
-    borderBottomWidth: 2,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    gap: 8,
+    borderBottomWidth: 3,
     borderBottomColor: 'transparent',
+    marginHorizontal: 4,
   },
   tabActive: {
     borderBottomColor: '#e63946',
+    backgroundColor: '#fff5f5',
   },
   tabLabel: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   tabLabelActive: {
     color: '#e63946',
