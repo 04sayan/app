@@ -306,37 +306,23 @@ function OrdersTab() {
   );
 }
 
-// Products Tab - Full CRUD
+// Products Tab - Simple CRUD
 function ProductsTab() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   
-  // Form state
+  // Simple form state
   const [formData, setFormData] = useState({
     name: '',
     category: '',
     shortDescription: '',
     fullDescription: '',
-    productType: 'weight', // 'weight' or 'pack'
     basePrice: '',
     inStock: true,
     images: [] as string[],
   });
-  
-  const [weightOptions, setWeightOptions] = useState([
-    { value: '250g', price: '', enabled: false },
-    { value: '500g', price: '', enabled: false },
-    { value: '750g', price: '', enabled: false },
-    { value: '1kg', price: '', enabled: false },
-  ]);
-  
-  const [packOptions, setPackOptions] = useState([
-    { value: '6 pieces', price: '', enabled: false },
-    { value: '12 pieces', price: '', enabled: false },
-    { value: 'tray', price: '', enabled: false },
-  ]);
 
   useEffect(() => {
     loadProducts();
@@ -361,22 +347,10 @@ function ProductsTab() {
       category: '',
       shortDescription: '',
       fullDescription: '',
-      productType: 'weight',
       basePrice: '',
       inStock: true,
       images: [],
     });
-    setWeightOptions([
-      { value: '250g', price: '', enabled: false },
-      { value: '500g', price: '', enabled: false },
-      { value: '750g', price: '', enabled: false },
-      { value: '1kg', price: '', enabled: false },
-    ]);
-    setPackOptions([
-      { value: '6 pieces', price: '', enabled: false },
-      { value: '12 pieces', price: '', enabled: false },
-      { value: 'tray', price: '', enabled: false },
-    ]);
     setShowForm(true);
   };
 
@@ -387,27 +361,10 @@ function ProductsTab() {
       category: product.category,
       shortDescription: product.shortDescription || '',
       fullDescription: product.fullDescription || '',
-      productType: product.productType || 'weight',
       basePrice: product.basePrice?.toString() || '',
       inStock: product.inStock,
       images: product.images || [],
     });
-    
-    // Load variants
-    if (product.variants && product.variants.length > 0) {
-      if (product.productType === 'weight') {
-        setWeightOptions(prev => prev.map(opt => {
-          const variant = product.variants.find((v: any) => v.value === opt.value);
-          return variant ? { ...opt, price: variant.price.toString(), enabled: true } : opt;
-        }));
-      } else {
-        setPackOptions(prev => prev.map(opt => {
-          const variant = product.variants.find((v: any) => v.value === opt.value);
-          return variant ? { ...opt, price: variant.price.toString(), enabled: true } : opt;
-        }));
-      }
-    }
-    
     setShowForm(true);
   };
 
@@ -440,19 +397,14 @@ function ProductsTab() {
   };
 
   const saveProduct = async () => {
-    if (!formData.name || !formData.category) {
-      Alert.alert('Error', 'Please fill required fields');
+    if (!formData.name || !formData.category || !formData.basePrice) {
+      Alert.alert('Error', 'Please fill required fields: Name, Category, Price');
       return;
     }
 
-    const variants = formData.productType === 'weight'
-      ? weightOptions.filter(o => o.enabled).map(o => ({ value: o.value, price: parseFloat(o.price) }))
-      : packOptions.filter(o => o.enabled).map(o => ({ value: o.value, price: parseFloat(o.price) }));
-
     const productData = {
       ...formData,
-      basePrice: parseFloat(formData.basePrice) || 0,
-      variants,
+      basePrice: parseFloat(formData.basePrice),
     };
 
     try {
@@ -470,10 +422,10 @@ function ProductsTab() {
     }
   };
 
-  const deleteProduct = (productId: string) => {
+  const deleteProduct = (productId: string, productName: string) => {
     Alert.alert(
       'Confirm Delete',
-      'Are you sure you want to delete this product?',
+      `Delete "${productName}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -500,7 +452,7 @@ function ProductsTab() {
           <TouchableOpacity onPress={() => setShowForm(false)}>
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.formTitle}>{editingProduct ? 'Edit Product' : 'Add Product'}</Text>
+          <Text style={styles.formTitle}>{editingProduct ? 'Edit Product' : 'Add New Product'}</Text>
         </View>
 
         <View style={styles.formGroup}>
@@ -509,7 +461,7 @@ function ProductsTab() {
             style={styles.formInput}
             value={formData.name}
             onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
-            placeholder="e.g., Fresh Chicken"
+            placeholder="e.g., Fresh Chicken Breast"
           />
         </View>
 
@@ -529,7 +481,7 @@ function ProductsTab() {
             style={styles.formInput}
             value={formData.shortDescription}
             onChangeText={(text) => setFormData(prev => ({ ...prev, shortDescription: text }))}
-            placeholder="Brief description"
+            placeholder="Brief product description"
             multiline
           />
         </View>
@@ -540,36 +492,14 @@ function ProductsTab() {
             style={[styles.formInput, styles.textArea]}
             value={formData.fullDescription}
             onChangeText={(text) => setFormData(prev => ({ ...prev, fullDescription: text }))}
-            placeholder="Detailed description"
+            placeholder="Detailed product information"
             multiline
             numberOfLines={4}
           />
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Product Type *</Text>
-          <View style={styles.radioGroup}>
-            <TouchableOpacity
-              style={[styles.radioBtn, formData.productType === 'weight' && styles.radioBtnActive]}
-              onPress={() => setFormData(prev => ({ ...prev, productType: 'weight' }))}
-            >
-              <Text style={[styles.radioBtnText, formData.productType === 'weight' && styles.radioBtnTextActive]}>
-                Weight-based
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.radioBtn, formData.productType === 'pack' && styles.radioBtnActive]}
-              onPress={() => setFormData(prev => ({ ...prev, productType: 'pack' }))}
-            >
-              <Text style={[styles.radioBtnText, formData.productType === 'pack' && styles.radioBtnTextActive]}>
-                Pack-based
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Base Price (₹)</Text>
+          <Text style={styles.label}>Price (₹) *</Text>
           <TextInput
             style={styles.formInput}
             value={formData.basePrice}
@@ -578,64 +508,6 @@ function ProductsTab() {
             keyboardType="numeric"
           />
         </View>
-
-        {formData.productType === 'weight' && (
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Weight Options</Text>
-            {weightOptions.map((opt, idx) => (
-              <View key={idx} style={styles.variantRow}>
-                <TouchableOpacity
-                  onPress={() => setWeightOptions(prev => prev.map((o, i) => i === idx ? { ...o, enabled: !o.enabled } : o))}
-                  style={styles.checkbox}
-                >
-                  <Ionicons
-                    name={opt.enabled ? 'checkbox' : 'square-outline'}
-                    size={24}
-                    color={opt.enabled ? '#e63946' : '#999'}
-                  />
-                </TouchableOpacity>
-                <Text style={styles.variantLabel}>{opt.value}</Text>
-                <TextInput
-                  style={[styles.variantInput, !opt.enabled && styles.variantInputDisabled]}
-                  value={opt.price}
-                  onChangeText={(text) => setWeightOptions(prev => prev.map((o, i) => i === idx ? { ...o, price: text } : o))}
-                  placeholder="Price"
-                  keyboardType="numeric"
-                  editable={opt.enabled}
-                />
-              </View>
-            ))}
-          </View>
-        )}
-
-        {formData.productType === 'pack' && (
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Pack Options</Text>
-            {packOptions.map((opt, idx) => (
-              <View key={idx} style={styles.variantRow}>
-                <TouchableOpacity
-                  onPress={() => setPackOptions(prev => prev.map((o, i) => i === idx ? { ...o, enabled: !o.enabled } : o))}
-                  style={styles.checkbox}
-                >
-                  <Ionicons
-                    name={opt.enabled ? 'checkbox' : 'square-outline'}
-                    size={24}
-                    color={opt.enabled ? '#e63946' : '#999'}
-                  />
-                </TouchableOpacity>
-                <Text style={styles.variantLabel}>{opt.value}</Text>
-                <TextInput
-                  style={[styles.variantInput, !opt.enabled && styles.variantInputDisabled]}
-                  value={opt.price}
-                  onChangeText={(text) => setPackOptions(prev => prev.map((o, i) => i === idx ? { ...o, price: text } : o))}
-                  placeholder="Price"
-                  keyboardType="numeric"
-                  editable={opt.enabled}
-                />
-              </View>
-            ))}
-          </View>
-        )}
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>Stock Status</Text>
@@ -656,17 +528,21 @@ function ProductsTab() {
           <Text style={styles.label}>Product Images (up to 5)</Text>
           <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImages}>
             <Ionicons name="images-outline" size={24} color="#e63946" />
-            <Text style={styles.imagePickerText}>Add Images</Text>
+            <Text style={styles.imagePickerText}>Select Images</Text>
           </TouchableOpacity>
-          <View style={styles.imageGrid}>
-            {formData.images.map((img, idx) => (
-              <View key={idx} style={styles.imagePreview}>
-                <TouchableOpacity style={styles.imageRemoveBtn} onPress={() => removeImage(idx)}>
-                  <Ionicons name="close-circle" size={24} color="#ff0000" />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
+          
+          {formData.images.length > 0 && (
+            <View style={styles.imageGrid}>
+              {formData.images.map((img, idx) => (
+                <View key={idx} style={styles.imagePreview}>
+                  <TouchableOpacity style={styles.imageRemoveBtn} onPress={() => removeImage(idx)}>
+                    <Ionicons name="close-circle" size={24} color="#ff0000" />
+                  </TouchableOpacity>
+                  <Text style={styles.imageIndexText}>Image {idx + 1}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <TouchableOpacity style={styles.saveBtn} onPress={saveProduct}>
@@ -692,28 +568,39 @@ function ProductsTab() {
       </TouchableOpacity>
 
       <ScrollView style={styles.tabContent}>
-        {products.map((product: any) => (
-          <View key={product._id} style={styles.productCard}>
-            <View style={styles.productHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.productName}>{product.name}</Text>
-                <Text style={styles.productCategory}>{product.category}</Text>
-                <Text style={styles.productPrice}>Base: ₹{product.basePrice}</Text>
-                <Text style={[styles.productStock, !product.inStock && styles.productOutOfStock]}>
-                  {product.inStock ? 'In Stock' : 'Out of Stock'}
-                </Text>
-              </View>
-              <View style={styles.productActions}>
-                <TouchableOpacity onPress={() => openEditForm(product)} style={styles.actionBtn}>
-                  <Ionicons name="create-outline" size={20} color="#4CAF50" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => deleteProduct(product._id)} style={styles.actionBtn}>
-                  <Ionicons name="trash-outline" size={20} color="#ff0000" />
-                </TouchableOpacity>
+        {products.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="cube-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>No products yet</Text>
+            <Text style={styles.emptySubtext}>Add your first product to get started</Text>
+          </View>
+        ) : (
+          products.map((product: any) => (
+            <View key={product._id} style={styles.productCard}>
+              <View style={styles.productHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.productName}>{product.name}</Text>
+                  <Text style={styles.productCategory}>{product.category}</Text>
+                  <Text style={styles.productPrice}>₹{product.basePrice}</Text>
+                  <Text style={[styles.productStock, !product.inStock && styles.productOutOfStock]}>
+                    {product.inStock ? '✓ In Stock' : '✗ Out of Stock'}
+                  </Text>
+                </View>
+                <View style={styles.productActions}>
+                  <TouchableOpacity onPress={() => openEditForm(product)} style={styles.actionBtn}>
+                    <Ionicons name="create-outline" size={22} color="#4CAF50" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => deleteProduct(product._id, product.name)} 
+                    style={styles.actionBtn}
+                  >
+                    <Ionicons name="trash-outline" size={22} color="#ff0000" />
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        ))}
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -1436,11 +1323,34 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#f0f0f0',
     position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   imageRemoveBtn: {
     position: 'absolute',
     top: -8,
     right: -8,
+  },
+  imageIndexText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
   },
   saveBtn: {
     backgroundColor: '#4CAF50',
