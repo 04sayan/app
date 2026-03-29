@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { orderAPI, slotAPI, pincodeAPI } from '../utils/api';
+import { orderAPI, slotAPI, pincodeAPI, addressAPI } from '../utils/api';
 import { useAuthStore } from '../store/authStore';
 import { useCartStore } from '../store/cartStore';
 import Header from '../components/Header';
@@ -34,6 +34,11 @@ export default function Checkout() {
   const [pincodeValid, setPincodeValid] = useState(false);
   const [checkingPincode, setCheckingPincode] = useState(false);
   
+  // Saved addresses
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [useNewAddress, setUseNewAddress] = useState(false);
+  
   // Address fields
   const [name, setName] = useState(customer?.name || '');
   const [phone, setPhone] = useState(customer?.phone || '');
@@ -44,11 +49,44 @@ export default function Checkout() {
 
   useEffect(() => {
     loadSlots();
+    loadSavedAddresses();
     if (servicePincode) {
       setPincode(servicePincode);
       setPincodeValid(true);
     }
   }, []);
+
+  const loadSavedAddresses = async () => {
+    if (!customer) return;
+    
+    try {
+      const response = await addressAPI.getCustomerAddresses(customer.phone);
+      setSavedAddresses(response.data);
+      
+      // Auto-select default address if exists
+      const defaultAddr = response.data.find((addr: any) => addr.isDefault);
+      if (defaultAddr) {
+        handleSelectAddress(defaultAddr);
+      } else if (response.data.length > 0) {
+        handleSelectAddress(response.data[0]);
+      }
+    } catch (error) {
+      console.error('Failed to load addresses:', error);
+    }
+  };
+
+  const handleSelectAddress = (address: any) => {
+    setSelectedAddress(address);
+    setFullAddress(address.fullAddress);
+    setArea(address.area);
+    setLandmark(address.landmark || '');
+    setPincode(address.pincode);
+    if (address.latitude && address.longitude) {
+      setLocation({ latitude: address.latitude, longitude: address.longitude });
+    }
+    setPincodeValid(true);
+    setUseNewAddress(false);
+  };
 
   const loadSlots = async () => {
     try {
@@ -209,7 +247,60 @@ export default function Checkout() {
           />
         </View>
 
+        {/* Saved Addresses */}
+        {savedAddresses.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Address</Text>
+            {savedAddresses.map((address: any) => (
+              <TouchableOpacity
+                key={address._id}
+                style={[
+                  styles.addressCard,
+                  selectedAddress?._id === address._id && styles.addressCardSelected,
+                ]}
+                onPress={() => handleSelectAddress(address)}
+              >
+                <View style={styles.radioButton}>
+                  <Ionicons
+                    name={selectedAddress?._id === address._id ? 'radio-button-on' : 'radio-button-off'}
+                    size={20}
+                    color="#e63946"
+                  />
+                </View>
+                <View style={styles.addressContent}>
+                  {address.isDefault && (
+                    <View style={styles.defaultBadge}>
+                      <Text style={styles.defaultBadgeText}>Default</Text>
+                    </View>
+                  )}
+                  <Text style={styles.addressText}>{address.fullAddress}</Text>
+                  <Text style={styles.addressDetail}>
+                    {address.area}, {address.pincode}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+            
+            <TouchableOpacity
+              style={styles.newAddressButton}
+              onPress={() => {
+                setUseNewAddress(true);
+                setSelectedAddress(null);
+                setFullAddress('');
+                setArea('');
+                setLandmark('');
+                setPincode('');
+                setPincodeValid(false);
+              }}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#e63946" />
+              <Text style={styles.newAddressText}>Use New Address</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Delivery Address */}
+        {(useNewAddress || savedAddresses.length === 0) && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Delivery Address</Text>
@@ -292,6 +383,7 @@ export default function Checkout() {
             </TouchableOpacity>
           </View>
         </View>
+        )}
 
         {/* Delivery Slot */}
         {slots.length > 0 && (
@@ -568,5 +660,61 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  addressCard: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 12,
+  },
+  addressCardSelected: {
+    borderColor: '#e63946',
+    backgroundColor: '#fee',
+  },
+  radioButton: {
+    marginRight: 12,
+  },
+  addressContent: {
+    flex: 1,
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  addressDetail: {
+    fontSize: 12,
+    color: '#666',
+  },
+  defaultBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  defaultBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  newAddressButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e63946',
+    borderStyle: 'dashed',
+  },
+  newAddressText: {
+    fontSize: 14,
+    color: '#e63946',
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

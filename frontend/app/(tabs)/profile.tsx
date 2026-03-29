@@ -57,24 +57,6 @@ export default function Profile() {
       subtitle: 'View all your past orders',
       onPress: () => router.push('/(tabs)/orders'),
     },
-    {
-      icon: 'notifications-outline',
-      title: 'Notifications',
-      subtitle: 'Manage notification preferences',
-      onPress: () => {},
-    },
-    {
-      icon: 'help-circle-outline',
-      title: 'Help & Support',
-      subtitle: 'Get help with your orders',
-      onPress: () => {},
-    },
-    {
-      icon: 'document-text-outline',
-      title: 'Terms & Conditions',
-      subtitle: 'Read our terms and privacy policy',
-      onPress: () => {},
-    },
   ];
 
   return (
@@ -118,15 +100,6 @@ export default function Profile() {
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* Admin Login */}
-        <TouchableOpacity
-          style={styles.adminButton}
-          onPress={() => router.push('/admin-login')}
-        >
-          <Ionicons name="shield-checkmark" size={20} color="#e63946" />
-          <Text style={styles.adminButtonText}>Admin Login</Text>
-        </TouchableOpacity>
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
