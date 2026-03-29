@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { adminAPI, orderAPI } from '../../utils/api';
 import Header from '../../components/Header';
+import { storage } from '../../utils/storage';
 
 export default function Admin() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function Admin() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +33,23 @@ export default function Admin() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Check if admin is already logged in
+  useEffect(() => {
+    const checkAdminAuth = async () => {
+      try {
+        const adminSession = await storage.getItem('adminSession');
+        if (adminSession) {
+          setIsLoggedIn(true);
+        }
+      } catch (error) {
+        console.error('Failed to check admin auth:', error);
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+    checkAdminAuth();
+  }, []);
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -70,11 +89,20 @@ export default function Admin() {
     try {
       const response = await adminAPI.login(username, password);
       if (response.data.success) {
+        // Save admin session
+        await storage.setItem('adminSession', JSON.stringify({
+          username,
+          token: response.data.token,
+          timestamp: Date.now(),
+        }));
         setIsLoggedIn(true);
         loadOrders();
       }
-    } catch (error) {
-      Alert.alert('Error', 'Invalid credentials. Use: admin / admin.1');
+    } catch (error: any) {
+      Alert.alert(
+        'Login Failed', 
+        error.response?.data?.detail || 'Invalid credentials.\n\nDefault credentials:\nUsername: admin\nPassword: admin.1'
+      );
     } finally {
       setLoginLoading(false);
     }
@@ -100,6 +128,13 @@ export default function Admin() {
     }
   }, [selectedStatus, isLoggedIn]);
 
+  const handleLogout = async () => {
+    await storage.removeItem('adminSession');
+    setIsLoggedIn(false);
+    setUsername('');
+    setPassword('');
+  };
+
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     try {
       await orderAPI.updateStatus(orderId, newStatus);
@@ -112,6 +147,18 @@ export default function Admin() {
 
   const statuses = ['Pending', 'Accepted', 'Preparing', 'OutForDelivery', 'Delivered'];
   const filterStatuses = [null, 'Pending', 'Accepted', 'Preparing', 'OutForDelivery', 'Delivered', 'Cancelled'];
+
+  // Show loading while checking authentication
+  if (checkingAuth) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#e63946" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
@@ -147,7 +194,7 @@ export default function Admin() {
             )}
 
             <Text style={styles.hintText}>
-              Hint: admin / hatbajar2025
+              Default: admin / admin.1
             </Text>
           </View>
         </View>
@@ -168,7 +215,7 @@ export default function Admin() {
           <TouchableOpacity onPress={() => setShowChangePassword(true)} style={styles.iconButton}>
             <Ionicons name="settings-outline" size={24} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setIsLoggedIn(false)} style={styles.iconButton}>
+          <TouchableOpacity onPress={handleLogout} style={styles.iconButton}>
             <Ionicons name="log-out-outline" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -464,5 +511,36 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#999',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 12,
+  },
+  iconButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  header: {
+    backgroundColor: '#e63946',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backButton: {
+    padding: 4,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+    marginLeft: 12,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
