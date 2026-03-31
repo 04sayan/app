@@ -20,7 +20,7 @@ type Section = 'dashboard' | 'products' | 'categories' | 'inventory' | 'orders' 
 // Default Admin Credentials
 const DEFAULT_ADMIN = {
   username: 'admin',
-  password: 'admin123'
+  password: 'admin.1'
 };
 
 export default function HatbajarAdmin() {
@@ -51,10 +51,10 @@ export default function HatbajarAdmin() {
       if (response.data.success) {
         setIsLoggedIn(true);
       } else {
-        Alert.alert('Login Failed', 'Invalid credentials\n\nDefault: admin / admin123');
+        Alert.alert('Login Failed', 'Invalid credentials\n\nDefault: admin / admin.1');
       }
     } catch (error) {
-      Alert.alert('Login Failed', 'Invalid credentials\n\nDefault: admin / admin123');
+      Alert.alert('Login Failed', 'Invalid credentials\n\nDefault: admin / admin.1');
     } finally {
       setLoginLoading(false);
     }
@@ -114,7 +114,7 @@ export default function HatbajarAdmin() {
             </TouchableOpacity>
           )}
 
-          <Text style={styles.defaultCreds}>Default: admin / admin123</Text>
+          <Text style={styles.defaultCreds}>Default: admin / admin.1</Text>
         </View>
       </SafeAreaView>
     );
