@@ -23,8 +23,6 @@ export default function RootLayout() {
       <Stack.Screen name="addresses" />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="order-detail" />
-      <Stack.Screen name="admin-login" />
-      <Stack.Screen name="admin" />
     </Stack>
   );
 }
