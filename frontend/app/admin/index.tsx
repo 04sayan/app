@@ -8,25 +8,25 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { adminAPI, orderAPI, productAPI, pincodeAPI } from '../../utils/api';
 import * as ImagePicker from 'expo-image-picker';
 
-type Tab = 'dashboard' | 'orders' | 'products' | 'customers' | 'pincodes' | 'settings';
+type Section = 'dashboard' | 'orders' | 'products' | 'categories' | 'inventory' | 'delivery' | 'coupons' | 'customers' | 'settings';
 
-export default function AdminMain() {
+export default function ModernAdminPanel() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
+  const [activeSection, setActiveSection] = useState<Section>('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleLogin = async () => {
     if (!username || !password) {
-      Alert.alert('Error', 'Please enter username and password');
+      Alert.alert('Error', 'Please enter credentials');
       return;
     }
 
@@ -37,10 +37,7 @@ export default function AdminMain() {
         setIsLoggedIn(true);
       }
     } catch (error: any) {
-      Alert.alert(
-        'Login Failed', 
-        error.response?.data?.detail || 'Invalid credentials.\n\nDefault credentials:\nUsername: admin\nPassword: admin.1'
-      );
+      Alert.alert('Login Failed', 'Invalid credentials. Use: admin / admin.1');
     } finally {
       setLoginLoading(false);
     }
@@ -52,49 +49,54 @@ export default function AdminMain() {
     setPassword('');
   };
 
-  const tabs = [
-    { id: 'dashboard' as Tab, icon: 'grid-outline', label: 'Dashboard' },
-    { id: 'orders' as Tab, icon: 'list-outline', label: 'Orders' },
-    { id: 'products' as Tab, icon: 'cube-outline', label: 'Products' },
-    { id: 'customers' as Tab, icon: 'people-outline', label: 'Customers' },
-    { id: 'pincodes' as Tab, icon: 'location-outline', label: 'Pincodes' },
-    { id: 'settings' as Tab, icon: 'settings-outline', label: 'Settings' },
+  const menuItems = [
+    { id: 'dashboard' as Section, icon: 'grid', label: 'Dashboard' },
+    { id: 'orders' as Section, icon: 'receipt', label: 'Orders' },
+    { id: 'products' as Section, icon: 'cube', label: 'Products' },
+    { id: 'categories' as Section, icon: 'apps', label: 'Categories' },
+    { id: 'inventory' as Section, icon: 'archive', label: 'Inventory' },
+    { id: 'delivery' as Section, icon: 'car', label: 'Delivery' },
+    { id: 'coupons' as Section, icon: 'pricetag', label: 'Coupons' },
+    { id: 'customers' as Section, icon: 'people', label: 'Customers' },
+    { id: 'settings' as Section, icon: 'settings', label: 'Settings' },
   ];
 
   if (!isLoggedIn) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loginContainer}>
-          <View style={styles.loginCard}>
-            <Ionicons name="shield-checkmark" size={64} color="#e63946" />
-            <Text style={styles.loginTitle}>Admin Panel</Text>
-            <Text style={styles.loginSubtitle}>Hatbajar Management</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Username"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-
-            {loginLoading ? (
-              <ActivityIndicator size="large" color="#e63946" style={styles.loader} />
-            ) : (
-              <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-                <Text style={styles.loginButtonText}>Login</Text>
-              </TouchableOpacity>
-            )}
-
-            <Text style={styles.hintText}>Default: admin / admin.1</Text>
+      <SafeAreaView style={styles.loginContainer}>
+        <View style={styles.loginBox}>
+          <View style={styles.loginHeader}>
+            <View style={styles.logoCircle}>
+              <Ionicons name="shield-checkmark" size={32} color="#fff" />
+            </View>
+            <Text style={styles.loginTitle}>Hatbajar Admin</Text>
+            <Text style={styles.loginSubtitle}>Management Portal</Text>
           </View>
+
+          <TextInput
+            style={styles.input}
+            placeholder="Username"
+            value={username}
+            onChangeText={setUsername}
+            autoCapitalize="none"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          {loginLoading ? (
+            <ActivityIndicator size="large" color="#2563eb" style={{ marginTop: 20 }} />
+          ) : (
+            <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
+              <Text style={styles.loginBtnText}>Sign In</Text>
+            </TouchableOpacity>
+          )}
+
+          <Text style={styles.hint}>admin / admin.1</Text>
         </View>
       </SafeAreaView>
     );
@@ -102,58 +104,72 @@ export default function AdminMain() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>🏪 Hatbajar Admin</Text>
-        <TouchableOpacity onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      <View style={styles.layout}>
+        {/* Sidebar */}
+        <View style={[styles.sidebar, sidebarCollapsed && styles.sidebarCollapsed]}>
+          <View style={styles.sidebarHeader}>
+            <Text style={styles.brandText}>🏪 Hatbajar</Text>
+          </View>
 
-      {/* Tab Navigation - MVP Admin Sections */}
-      <View style={styles.tabNav}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 8 }}>
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tab, activeTab === tab.id && styles.tabActive]}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Ionicons
-                name={tab.icon as any}
-                size={22}
-                color={activeTab === tab.id ? '#e63946' : '#666'}
-              />
-              <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
-                {tab.label}
-              </Text>
+          <ScrollView style={styles.menu}>
+            {menuItems.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.menuItem, activeSection === item.id && styles.menuItemActive]}
+                onPress={() => setActiveSection(item.id)}
+              >
+                <Ionicons
+                  name={item.icon as any}
+                  size={20}
+                  color={activeSection === item.id ? '#2563eb' : '#64748b'}
+                />
+                {!sidebarCollapsed && (
+                  <Text style={[styles.menuText, activeSection === item.id && styles.menuTextActive]}>
+                    {item.label}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color="#dc2626" />
+            {!sidebarCollapsed && <Text style={styles.logoutText}>Logout</Text>}
+          </TouchableOpacity>
+        </View>
+
+        {/* Main Content */}
+        <View style={styles.mainContent}>
+          <View style={styles.topBar}>
+            <TouchableOpacity onPress={() => setSidebarCollapsed(!sidebarCollapsed)}>
+              <Ionicons name="menu" size={24} color="#1e293b" />
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+            <Text style={styles.pageTitle}>
+              {menuItems.find(m => m.id === activeSection)?.label}
+            </Text>
+          </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        {activeTab === 'dashboard' && <DashboardTab />}
-        {activeTab === 'orders' && <OrdersTab />}
-        {activeTab === 'products' && <ProductsTab />}
-        {activeTab === 'customers' && <CustomersTab />}
-        {activeTab === 'pincodes' && <PincodesTab />}
-        {activeTab === 'settings' && <SettingsTab />}
+          <ScrollView style={styles.contentArea}>
+            {activeSection === 'dashboard' && <DashboardSection />}
+            {activeSection === 'orders' && <OrdersSection />}
+            {activeSection === 'products' && <ProductsSection />}
+            {activeSection === 'categories' && <CategoriesSection />}
+            {activeSection === 'inventory' && <InventorySection />}
+            {activeSection === 'delivery' && <DeliverySection />}
+            {activeSection === 'coupons' && <CouponsSection />}
+            {activeSection === 'customers' && <CustomersSection />}
+            {activeSection === 'settings' && <SettingsSection />}
+          </ScrollView>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
-// Dashboard Tab
-function DashboardTab() {
+// Dashboard Section
+function DashboardSection() {
+  const [stats, setStats] = useState({ newOrders: 0, activeOrders: 0, delivered: 0, products: 0 });
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    newOrders: 0,
-    activeOrders: 0,
-    deliveredOrders: 0,
-    totalProducts: 0,
-  });
 
   useEffect(() => {
     loadStats();
@@ -165,15 +181,12 @@ function DashboardTab() {
         orderAPI.getAll({}),
         productAPI.getAll({}),
       ]);
-
       const orders = ordersRes.data;
       setStats({
         newOrders: orders.filter((o: any) => o.status === 'Pending').length,
-        activeOrders: orders.filter((o: any) => 
-          ['Accepted', 'Preparing', 'OutForDelivery'].includes(o.status)
-        ).length,
-        deliveredOrders: orders.filter((o: any) => o.status === 'Delivered').length,
-        totalProducts: productsRes.data.length,
+        activeOrders: orders.filter((o: any) => ['Accepted', 'Preparing', 'OutForDelivery'].includes(o.status)).length,
+        delivered: orders.filter((o: any) => o.status === 'Delivered').length,
+        products: productsRes.data.length,
       });
     } catch (error) {
       console.error('Failed to load stats');
@@ -185,38 +198,41 @@ function DashboardTab() {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#e63946" />
+        <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
   }
 
   const statCards = [
-    { title: 'New Orders', value: stats.newOrders, icon: 'notifications', color: '#ff6b6b' },
-    { title: 'Active Orders', value: stats.activeOrders, icon: 'time', color: '#ffa500' },
-    { title: 'Delivered', value: stats.deliveredOrders, icon: 'checkmark-circle', color: '#4CAF50' },
-    { title: 'Products', value: stats.totalProducts, icon: 'cube', color: '#e63946' },
+    { title: 'New Orders', value: stats.newOrders, icon: 'notifications', color: '#ef4444', bg: '#fee2e2' },
+    { title: 'Active Orders', value: stats.activeOrders, icon: 'timer', color: '#f59e0b', bg: '#fef3c7' },
+    { title: 'Delivered', value: stats.delivered, icon: 'checkmark-circle', color: '#10b981', bg: '#d1fae5' },
+    { title: 'Total Products', value: stats.products, icon: 'cube', color: '#3b82f6', bg: '#dbeafe' },
   ];
 
   return (
-    <ScrollView style={styles.tabContent}>
+    <View style={styles.section}>
       <View style={styles.statsGrid}>
-        {statCards.map((card, index) => (
-          <View key={index} style={[styles.statCard, { borderLeftColor: card.color }]}>
-            <Ionicons name={card.icon as any} size={32} color={card.color} />
+        {statCards.map((card, idx) => (
+          <View key={idx} style={[styles.statCard, { backgroundColor: card.bg }]}>
+            <View style={[styles.statIconBox, { backgroundColor: card.color }]}>
+              <Ionicons name={card.icon as any} size={24} color="#fff" />
+            </View>
             <Text style={styles.statValue}>{card.value}</Text>
-            <Text style={styles.statTitle}>{card.title}</Text>
+            <Text style={styles.statLabel}>{card.title}</Text>
           </View>
         ))}
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
-// Orders Tab
-function OrdersTab() {
+// Orders Section
+function OrdersSection() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadOrders();
@@ -229,7 +245,7 @@ function OrdersTab() {
       const response = await orderAPI.getAll(params);
       setOrders(response.data);
     } catch (error) {
-      console.error('Failed to load orders');
+      Alert.alert('Error', 'Failed to load orders');
     } finally {
       setLoading(false);
     }
@@ -245,20 +261,40 @@ function OrdersTab() {
     }
   };
 
-  const statuses = ['Pending', 'Accepted', 'Preparing', 'OutForDelivery', 'Delivered'];
-  const filterStatuses = [null, ...statuses, 'Cancelled'];
+  const statuses = ['Pending', 'Accepted', 'Preparing', 'OutForDelivery', 'Delivered', 'Cancelled'];
+  const filterOptions = [{ label: 'All', value: null }, ...statuses.map(s => ({ label: s, value: s }))];
+
+  const filteredOrders = orders.filter((order: any) => {
+    if (searchQuery) {
+      return (
+        order.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customerPhone.includes(searchQuery)
+      );
+    }
+    return true;
+  });
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {filterStatuses.map((status) => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by Order ID, Name, or Phone..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar}>
+        {filterOptions.map((option, idx) => (
           <TouchableOpacity
-            key={status || 'all'}
-            style={[styles.filterChip, selectedStatus === status && styles.filterChipActive]}
-            onPress={() => setSelectedStatus(status)}
+            key={idx}
+            style={[styles.filterChip, selectedStatus === option.value && styles.filterChipActive]}
+            onPress={() => setSelectedStatus(option.value)}
           >
-            <Text style={[styles.filterText, selectedStatus === status && styles.filterTextActive]}>
-              {status || 'All'}
+            <Text style={[styles.filterChipText, selectedStatus === option.value && styles.filterChipTextActive]}>
+              {option.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -266,61 +302,87 @@ function OrdersTab() {
 
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#e63946" />
+          <ActivityIndicator size="large" color="#2563eb" />
         </View>
       ) : (
-        <ScrollView style={styles.tabContent}>
-          {orders.map((order: any) => (
+        <View>
+          {filteredOrders.map((order: any) => (
             <View key={order._id} style={styles.orderCard}>
               <View style={styles.orderHeader}>
-                <Text style={styles.orderId}>#{order.orderId}</Text>
+                <Text style={styles.orderID}>#{order.orderId}</Text>
                 <Text style={styles.orderAmount}>₹{order.totalAmount}</Text>
               </View>
-              <Text style={styles.orderCustomer}>{order.customerName}</Text>
-              <Text style={styles.orderPhone}>{order.customerPhone}</Text>
+
+              <View style={styles.orderInfo}>
+                <View style={styles.infoRow}>
+                  <Ionicons name="person" size={16} color="#64748b" />
+                  <Text style={styles.infoText}>{order.customerName}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Ionicons name="call" size={16} color="#64748b" />
+                  <Text style={styles.infoText}>{order.customerPhone}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Ionicons name="location" size={16} color="#64748b" />
+                  <Text style={styles.infoText}>
+                    {order.deliveryAddress?.area}, {order.deliveryAddress?.pincode}
+                  </Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Ionicons name="time" size={16} color="#64748b" />
+                  <Text style={styles.infoText}>
+                    {new Date(order.createdAt).toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+
               <View style={styles.orderItems}>
                 {order.items.map((item: any, idx: number) => (
                   <Text key={idx} style={styles.itemText}>
-                    • {item.productName} {item.variant?.value} x{item.quantity}
+                    • {item.productName} ({item.variant?.value}) x{item.quantity}
                   </Text>
                 ))}
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRow}>
-                {statuses.map((status) => (
-                  <TouchableOpacity
-                    key={status}
-                    style={[styles.statusBtn, order.status === status && styles.statusBtnActive]}
-                    onPress={() => updateStatus(order.orderId, status)}
-                  >
-                    <Text style={[styles.statusBtnText, order.status === status && styles.statusBtnTextActive]}>
-                      {status}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+
+              <View style={styles.statusActions}>
+                <Text style={styles.statusLabel}>Update Status:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {statuses.map((status) => (
+                    <TouchableOpacity
+                      key={status}
+                      style={[styles.statusBtn, order.status === status && styles.statusBtnActive]}
+                      onPress={() => updateStatus(order.orderId, status)}
+                    >
+                      <Text style={[styles.statusBtnText, order.status === status && styles.statusBtnTextActive]}>
+                        {status}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             </View>
           ))}
-        </ScrollView>
+        </View>
       )}
     </View>
   );
 }
 
-// Products Tab - Simple CRUD
-function ProductsTab() {
+// Products Section (Simplified version from before)
+function ProductsSection() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
-  
-  // Simple form state
   const [formData, setFormData] = useState({
     name: '',
     category: '',
     shortDescription: '',
     fullDescription: '',
     basePrice: '',
+    offerPrice: '',
     inStock: true,
+    unit: '',
     images: [] as string[],
   });
 
@@ -348,72 +410,33 @@ function ProductsTab() {
       shortDescription: '',
       fullDescription: '',
       basePrice: '',
+      offerPrice: '',
       inStock: true,
+      unit: '',
       images: [],
     });
     setShowForm(true);
   };
 
-  const openEditForm = (product: any) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      category: product.category,
-      shortDescription: product.shortDescription || '',
-      fullDescription: product.fullDescription || '',
-      basePrice: product.basePrice?.toString() || '',
-      inStock: product.inStock,
-      images: product.images || [],
-    });
-    setShowForm(true);
-  };
-
-  const pickImages = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        quality: 0.7,
-        base64: true,
-      });
-
-      if (!result.canceled && result.assets) {
-        const base64Images = result.assets.map(asset => `data:image/jpeg;base64,${asset.base64}`);
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, ...base64Images].slice(0, 5),
-        }));
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick images');
-    }
-  };
-
-  const removeImage = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }));
-  };
-
   const saveProduct = async () => {
-    if (!formData.name || !formData.category || !formData.basePrice) {
-      Alert.alert('Error', 'Please fill required fields: Name, Category, Price');
+    if (!formData.name || !formData.basePrice) {
+      Alert.alert('Error', 'Name and Price are required');
       return;
     }
 
     const productData = {
       ...formData,
       basePrice: parseFloat(formData.basePrice),
+      offerPrice: formData.offerPrice ? parseFloat(formData.offerPrice) : null,
     };
 
     try {
       if (editingProduct) {
         await productAPI.update(editingProduct._id, productData);
-        Alert.alert('Success', 'Product updated successfully');
+        Alert.alert('Success', 'Product updated');
       } else {
         await productAPI.create(productData);
-        Alert.alert('Success', 'Product added successfully');
+        Alert.alert('Success', 'Product added');
       }
       setShowForm(false);
       loadProducts();
@@ -422,37 +445,14 @@ function ProductsTab() {
     }
   };
 
-  const deleteProduct = (productId: string, productName: string) => {
-    Alert.alert(
-      'Confirm Delete',
-      `Delete "${productName}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await productAPI.delete(productId);
-              Alert.alert('Success', 'Product deleted');
-              loadProducts();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete product');
-            }
-          },
-        },
-      ]
-    );
-  };
-
   if (showForm) {
     return (
-      <ScrollView style={styles.tabContent}>
+      <View style={styles.section}>
         <View style={styles.formHeader}>
           <TouchableOpacity onPress={() => setShowForm(false)}>
-            <Ionicons name="arrow-back" size={24} color="#333" />
+            <Ionicons name="arrow-back" size={24} color="#1e293b" />
           </TouchableOpacity>
-          <Text style={styles.formTitle}>{editingProduct ? 'Edit Product' : 'Add New Product'}</Text>
+          <Text style={styles.formTitle}>{editingProduct ? 'Edit Product' : 'Add Product'}</Text>
         </View>
 
         <View style={styles.formGroup}>
@@ -461,7 +461,7 @@ function ProductsTab() {
             style={styles.formInput}
             value={formData.name}
             onChangeText={(text) => setFormData(prev => ({ ...prev, name: text }))}
-            placeholder="e.g., Fresh Chicken Breast"
+            placeholder="Product name"
           />
         </View>
 
@@ -471,7 +471,40 @@ function ProductsTab() {
             style={styles.formInput}
             value={formData.category}
             onChangeText={(text) => setFormData(prev => ({ ...prev, category: text }))}
-            placeholder="e.g., Chicken, Eggs"
+            placeholder="Category"
+          />
+        </View>
+
+        <View style={styles.formRow}>
+          <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+            <Text style={styles.label}>Price *</Text>
+            <TextInput
+              style={styles.formInput}
+              value={formData.basePrice}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, basePrice: text }))}
+              placeholder="0"
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+            <Text style={styles.label}>Offer Price</Text>
+            <TextInput
+              style={styles.formInput}
+              value={formData.offerPrice}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, offerPrice: text }))}
+              placeholder="0"
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Unit (kg, piece, dozen, etc.)</Text>
+          <TextInput
+            style={styles.formInput}
+            value={formData.unit}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, unit: text }))}
+            placeholder="kg"
           />
         </View>
 
@@ -481,723 +514,480 @@ function ProductsTab() {
             style={styles.formInput}
             value={formData.shortDescription}
             onChangeText={(text) => setFormData(prev => ({ ...prev, shortDescription: text }))}
-            placeholder="Brief product description"
+            placeholder="Brief description"
             multiline
           />
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Full Description</Text>
-          <TextInput
-            style={[styles.formInput, styles.textArea]}
-            value={formData.fullDescription}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, fullDescription: text }))}
-            placeholder="Detailed product information"
-            multiline
-            numberOfLines={4}
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Price (₹) *</Text>
-          <TextInput
-            style={styles.formInput}
-            value={formData.basePrice}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, basePrice: text }))}
-            placeholder="0"
-            keyboardType="numeric"
-          />
-        </View>
-
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Stock Status</Text>
           <TouchableOpacity
-            style={styles.switchRow}
+            style={styles.toggleRow}
             onPress={() => setFormData(prev => ({ ...prev, inStock: !prev.inStock }))}
           >
-            <Text style={styles.switchLabel}>{formData.inStock ? 'In Stock' : 'Out of Stock'}</Text>
+            <Text style={styles.toggleLabel}>In Stock</Text>
             <Ionicons
               name={formData.inStock ? 'toggle' : 'toggle-outline'}
               size={40}
-              color={formData.inStock ? '#4CAF50' : '#999'}
+              color={formData.inStock ? '#10b981' : '#94a3b8'}
             />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Product Images (up to 5)</Text>
-          <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImages}>
-            <Ionicons name="images-outline" size={24} color="#e63946" />
-            <Text style={styles.imagePickerText}>Select Images</Text>
-          </TouchableOpacity>
-          
-          {formData.images.length > 0 && (
-            <View style={styles.imageGrid}>
-              {formData.images.map((img, idx) => (
-                <View key={idx} style={styles.imagePreview}>
-                  <TouchableOpacity style={styles.imageRemoveBtn} onPress={() => removeImage(idx)}>
-                    <Ionicons name="close-circle" size={24} color="#ff0000" />
-                  </TouchableOpacity>
-                  <Text style={styles.imageIndexText}>Image {idx + 1}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-
         <TouchableOpacity style={styles.saveBtn} onPress={saveProduct}>
-          <Text style={styles.saveBtnText}>{editingProduct ? 'Update Product' : 'Add Product'}</Text>
+          <Text style={styles.saveBtnText}>Save Product</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     );
   }
 
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#e63946" />
+        <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      <TouchableOpacity style={styles.addBtn} onPress={openAddForm}>
-        <Ionicons name="add-circle-outline" size={24} color="#fff" />
-        <Text style={styles.addBtnText}>Add Product</Text>
+    <View style={styles.section}>
+      <TouchableOpacity style={styles.addButton} onPress={openAddForm}>
+        <Ionicons name="add" size={20} color="#fff" />
+        <Text style={styles.addButtonText}>Add Product</Text>
       </TouchableOpacity>
 
-      <ScrollView style={styles.tabContent}>
-        {products.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="cube-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>No products yet</Text>
-            <Text style={styles.emptySubtext}>Add your first product to get started</Text>
-          </View>
-        ) : (
-          products.map((product: any) => (
-            <View key={product._id} style={styles.productCard}>
-              <View style={styles.productHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.productName}>{product.name}</Text>
-                  <Text style={styles.productCategory}>{product.category}</Text>
-                  <Text style={styles.productPrice}>₹{product.basePrice}</Text>
-                  <Text style={[styles.productStock, !product.inStock && styles.productOutOfStock]}>
-                    {product.inStock ? '✓ In Stock' : '✗ Out of Stock'}
-                  </Text>
-                </View>
-                <View style={styles.productActions}>
-                  <TouchableOpacity onPress={() => openEditForm(product)} style={styles.actionBtn}>
-                    <Ionicons name="create-outline" size={22} color="#4CAF50" />
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    onPress={() => deleteProduct(product._id, product.name)} 
-                    style={styles.actionBtn}
-                  >
-                    <Ionicons name="trash-outline" size={22} color="#ff0000" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
-    </View>
-  );
-}
-
-// Customers Tab
-function CustomersTab() {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadCustomers();
-  }, []);
-
-  const loadCustomers = async () => {
-    try {
-      const response = await adminAPI.getCustomers();
-      setCustomers(response.data);
-    } catch (error) {
-      console.error('Failed to load customers');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#e63946" />
-      </View>
-    );
-  }
-
-  return (
-    <ScrollView style={styles.tabContent}>
-      {customers.map((customer: any) => (
-        <View key={customer._id} style={styles.customerCard}>
-          <Text style={styles.customerName}>{customer.name || 'No Name'}</Text>
-          <Text style={styles.customerPhone}>{customer.phone}</Text>
-          <Text style={styles.customerOrders}>{customer.orderCount || 0} orders</Text>
-        </View>
-      ))}
-    </ScrollView>
-  );
-}
-
-// Pincodes Tab - Service Area Management
-function PincodesTab() {
-  const [pincodes, setPincodes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newPincode, setNewPincode] = useState('');
-  const [newArea, setNewArea] = useState('');
-
-  useEffect(() => {
-    loadPincodes();
-  }, []);
-
-  const loadPincodes = async () => {
-    setLoading(true);
-    try {
-      const response = await pincodeAPI.getAll();
-      setPincodes(response.data);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load pincodes');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addPincode = async () => {
-    if (!newPincode || !newArea) {
-      Alert.alert('Error', 'Please fill all fields');
-      return;
-    }
-
-    try {
-      await pincodeAPI.create({ pincode: newPincode, area: newArea, isActive: true });
-      Alert.alert('Success', 'Pincode added successfully');
-      setNewPincode('');
-      setNewArea('');
-      setShowAddForm(false);
-      loadPincodes();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to add pincode');
-    }
-  };
-
-  const togglePincode = async (id: string, currentStatus: boolean) => {
-    try {
-      await pincodeAPI.update(id, { isActive: !currentStatus });
-      loadPincodes();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update pincode');
-    }
-  };
-
-  const deletePincode = (id: string) => {
-    Alert.alert(
-      'Confirm Delete',
-      'Remove this service area?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await pincodeAPI.delete(id);
-              Alert.alert('Success', 'Pincode removed');
-              loadPincodes();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete pincode');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#e63946" />
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ flex: 1 }}>
-      {showAddForm ? (
-        <View style={styles.addPincodeForm}>
-          <View style={styles.formHeader}>
-            <TouchableOpacity onPress={() => setShowAddForm(false)}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-            <Text style={styles.formTitle}>Add Service Area</Text>
-          </View>
-          <TextInput
-            style={styles.formInput}
-            placeholder="Pincode (e.g., 560001)"
-            value={newPincode}
-            onChangeText={setNewPincode}
-            keyboardType="numeric"
-          />
-          <TextInput
-            style={styles.formInput}
-            placeholder="Area Name (e.g., Bangalore Central)"
-            value={newArea}
-            onChangeText={setNewArea}
-          />
-          <TouchableOpacity style={styles.saveBtn} onPress={addPincode}>
-            <Text style={styles.saveBtnText}>Add Pincode</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddForm(true)}>
-            <Ionicons name="add-circle-outline" size={24} color="#fff" />
-            <Text style={styles.addBtnText}>Add Pincode</Text>
-          </TouchableOpacity>
-
-          <ScrollView style={styles.tabContent}>
-            {pincodes.map((pincode: any) => (
-              <View key={pincode._id} style={styles.pincodeCard}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.pincodeCode}>{pincode.pincode}</Text>
-                  <Text style={styles.pincodeArea}>{pincode.area}</Text>
-                  <Text style={[styles.pincodeStatus, !pincode.isActive && styles.pincodeInactive]}>
-                    {pincode.isActive ? 'Active' : 'Inactive'}
-                  </Text>
-                </View>
-                <View style={styles.pincodeActions}>
-                  <TouchableOpacity onPress={() => togglePincode(pincode._id, pincode.isActive)}>
-                    <Ionicons
-                      name={pincode.isActive ? 'toggle' : 'toggle-outline'}
-                      size={32}
-                      color={pincode.isActive ? '#4CAF50' : '#999'}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => deletePincode(pincode._id)} style={{ marginLeft: 12 }}>
-                    <Ionicons name="trash-outline" size={20} color="#ff0000" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        </>
-      )}
-    </View>
-  );
-}
-
-// Settings Tab - Delivery Settings
-function SettingsTab() {
-  const [settings, setSettings] = useState({
-    ordersActive: true,
-    defaultDeliveryTime: '24 hours',
-    deliverySlots: ['9 AM - 12 PM', '12 PM - 3 PM', '3 PM - 6 PM', '6 PM - 9 PM'],
-  });
-
-  const toggleOrders = async () => {
-    setSettings(prev => ({ ...prev, ordersActive: !prev.ordersActive }));
-    Alert.alert('Success', settings.ordersActive ? 'Orders paused' : 'Orders resumed');
-  };
-
-  const updateDeliveryTime = (time: string) => {
-    setSettings(prev => ({ ...prev, defaultDeliveryTime: time }));
-  };
-
-  return (
-    <ScrollView style={styles.tabContent}>
-      <View style={styles.settingCard}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.settingTitle}>Accept New Orders</Text>
-          <Text style={styles.settingDesc}>
-            {settings.ordersActive ? 'Customers can place orders' : 'Order placement is paused'}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={toggleOrders}>
-          <Ionicons
-            name={settings.ordersActive ? 'toggle' : 'toggle-outline'}
-            size={40}
-            color={settings.ordersActive ? '#4CAF50' : '#999'}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.settingCard}>
-        <Text style={styles.settingTitle}>Default Delivery Time</Text>
-        <View style={styles.radioGroup}>
-          {['24 hours', '48 hours', 'Same day'].map(time => (
-            <TouchableOpacity
-              key={time}
-              style={[styles.radioBtn, settings.defaultDeliveryTime === time && styles.radioBtnActive]}
-              onPress={() => updateDeliveryTime(time)}
-            >
-              <Text style={[styles.radioBtnText, settings.defaultDeliveryTime === time && styles.radioBtnTextActive]}>
-                {time}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.settingCard}>
-        <Text style={styles.settingTitle}>Delivery Slots</Text>
-        {settings.deliverySlots.map((slot, idx) => (
-          <View key={idx} style={styles.slotRow}>
-            <Ionicons name="time-outline" size={20} color="#666" />
-            <Text style={styles.slotText}>{slot}</Text>
+      <View style={styles.productGrid}>
+        {products.map((product: any) => (
+          <View key={product._id} style={styles.productCard}>
+            <Text style={styles.productName}>{product.name}</Text>
+            <Text style={styles.productCategory}>{product.category}</Text>
+            <Text style={styles.productPrice}>₹{product.basePrice}</Text>
+            <Text style={[styles.productStock, !product.inStock && styles.outOfStock]}>
+              {product.inStock ? '✓ In Stock' : '✗ Out of Stock'}
+            </Text>
           </View>
         ))}
       </View>
-    </ScrollView>
+    </View>
+  );
+}
+
+// Placeholder sections
+function CategoriesSection() {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.placeholder}>Categories Management - Coming Soon</Text>
+    </View>
+  );
+}
+
+function InventorySection() {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.placeholder}>Inventory & Stock Management - Coming Soon</Text>
+    </View>
+  );
+}
+
+function DeliverySection() {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.placeholder}>Delivery Management - Coming Soon</Text>
+    </View>
+  );
+}
+
+function CouponsSection() {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.placeholder}>Coupons Management - Coming Soon</Text>
+    </View>
+  );
+}
+
+function CustomersSection() {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.placeholder}>Customers Management - Coming Soon</Text>
+    </View>
+  );
+}
+
+function SettingsSection() {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.placeholder}>Settings - Coming Soon</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
   },
   loginContainer: {
     flex: 1,
+    backgroundColor: '#f8fafc',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  loginCard: {
+  loginBox: {
     backgroundColor: '#fff',
-    padding: 32,
     borderRadius: 16,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  loginHeader: {
     alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#2563eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   loginTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
+    color: '#1e293b',
+    marginBottom: 4,
   },
   loginSubtitle: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 32,
+    color: '#64748b',
   },
   input: {
-    width: '100%',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e2e8f0',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
     marginBottom: 16,
+    backgroundColor: '#f8fafc',
   },
-  loginButton: {
-    width: '100%',
-    backgroundColor: '#e63946',
+  loginBtn: {
+    backgroundColor: '#2563eb',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
+    marginTop: 8,
   },
-  loginButtonText: {
+  loginBtnText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  loader: {
-    marginVertical: 20,
-  },
-  hintText: {
+  hint: {
+    textAlign: 'center',
     fontSize: 12,
-    color: '#999',
+    color: '#94a3b8',
     marginTop: 16,
   },
-  header: {
-    backgroundColor: '#e63946',
+  layout: {
+    flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
   },
-  headerTitle: {
+  sidebar: {
+    width: 240,
+    backgroundColor: '#fff',
+    borderRightWidth: 1,
+    borderRightColor: '#e2e8f0',
+  },
+  sidebarCollapsed: {
+    width: 70,
+  },
+  sidebarHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  brandText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#1e293b',
   },
-  tabNav: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 2,
-    borderBottomColor: '#ddd',
-    paddingVertical: 4,
+  menu: {
+    flex: 1,
+    paddingVertical: 16,
   },
-  tab: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 14,
-    gap: 8,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-    marginHorizontal: 4,
+    paddingVertical: 12,
+    gap: 12,
   },
-  tabActive: {
-    borderBottomColor: '#e63946',
-    backgroundColor: '#fff5f5',
+  menuItemActive: {
+    backgroundColor: '#eff6ff',
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563eb',
   },
-  tabLabel: {
+  menuText: {
     fontSize: 15,
-    color: '#666',
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  menuTextActive: {
+    color: '#2563eb',
     fontWeight: '600',
   },
-  tabLabelActive: {
-    color: '#e63946',
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  logoutText: {
+    fontSize: 15,
+    color: '#dc2626',
+    fontWeight: '500',
+  },
+  mainContent: {
+    flex: 1,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    gap: 16,
+  },
+  pageTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#1e293b',
   },
-  content: {
+  contentArea: {
     flex: 1,
+    padding: 24,
   },
-  tabContent: {
+  section: {
     flex: 1,
-    padding: 16,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 60,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 16,
   },
   statCard: {
-    backgroundColor: '#fff',
+    width: '48%',
+    padding: 20,
     borderRadius: 12,
-    padding: 16,
-    width: '47%',
-    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
-    marginTop: 8,
+    color: '#1e293b',
+    marginBottom: 4,
   },
-  statTitle: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
+  statLabel: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '500',
   },
-  filterRow: {
+  sectionHeader: {
+    marginBottom: 16,
+  },
+  searchInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    fontSize: 15,
+  },
+  filterBar: {
+    flexDirection: 'row',
+    marginBottom: 16,
   },
   filterChip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    backgroundColor: '#fff',
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   filterChipActive: {
-    backgroundColor: '#e63946',
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
   },
-  filterText: {
+  filterChipText: {
     fontSize: 13,
-    color: '#666',
-    fontWeight: '600',
+    color: '#64748b',
+    fontWeight: '500',
   },
-  filterTextActive: {
+  filterChipTextActive: {
     color: '#fff',
   },
   orderCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  orderId: {
+  orderID: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1e293b',
   },
   orderAmount: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#e63946',
+    color: '#10b981',
   },
-  orderCustomer: {
+  orderInfo: {
+    marginBottom: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  infoText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  orderPhone: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 2,
+    color: '#64748b',
   },
   orderItems: {
-    marginTop: 8,
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 8,
     marginBottom: 12,
   },
   itemText: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 13,
+    color: '#475569',
     marginBottom: 4,
   },
-  statusRow: {
-    flexDirection: 'row',
+  statusActions: {
     marginTop: 8,
+  },
+  statusLabel: {
+    fontSize: 13,
+    color: '#64748b',
+    marginBottom: 8,
+    fontWeight: '500',
   },
   statusBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+    backgroundColor: '#f1f5f9',
     marginRight: 8,
   },
   statusBtnActive: {
-    backgroundColor: '#e63946',
+    backgroundColor: '#2563eb',
   },
   statusBtnText: {
-    fontSize: 11,
-    color: '#666',
-    fontWeight: '600',
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
   },
   statusBtnTextActive: {
     color: '#fff',
   },
-  sectionNote: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontStyle: 'italic',
-  },
-  productCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  productName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  productPrice: {
-    fontSize: 14,
-    color: '#e63946',
-    marginTop: 4,
-  },
-  productStock: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  customerCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  customerName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  customerPhone: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  customerOrders: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 4,
-  },
-  couponCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  couponCode: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  couponValue: {
-    fontSize: 14,
-    color: '#e63946',
-    marginTop: 4,
-  },
-  couponStatus: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  pincodeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pincodeCode: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  pincodeArea: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  pincodeStatus: {
-    fontSize: 12,
-    color: '#4CAF50',
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  pincodeInactive: {
-    color: '#999',
-  },
-  pincodeActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addBtn: {
-    backgroundColor: '#e63946',
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
-    margin: 16,
+    backgroundColor: '#2563eb',
+    paddingVertical: 12,
     borderRadius: 8,
+    marginBottom: 16,
     gap: 8,
   },
-  addBtnText: {
+  addButtonText: {
     color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  productGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  productCard: {
+    width: '48%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  productName: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  productCategory: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginBottom: 8,
+  },
+  productPrice: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#10b981',
+    marginBottom: 4,
+  },
+  productStock: {
+    fontSize: 12,
+    color: '#10b981',
+    fontWeight: '500',
+  },
+  outOfStock: {
+    color: '#ef4444',
   },
   formHeader: {
     flexDirection: 'row',
@@ -1208,152 +998,42 @@ const styles = StyleSheet.create({
   formTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1e293b',
   },
   formGroup: {
     marginBottom: 20,
   },
+  formRow: {
+    flexDirection: 'row',
+  },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: '#475569',
     marginBottom: 8,
   },
   formInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e2e8f0',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 16,
+    fontSize: 15,
     backgroundColor: '#fff',
   },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  radioGroup: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  radioBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  radioBtnActive: {
-    backgroundColor: '#e63946',
-    borderColor: '#e63946',
-  },
-  radioBtnText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '600',
-  },
-  radioBtnTextActive: {
-    color: '#fff',
-  },
-  variantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 12,
-  },
-  checkbox: {
-    padding: 4,
-  },
-  variantLabel: {
-    fontSize: 14,
-    color: '#333',
-    flex: 1,
-  },
-  variantInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    width: 100,
-  },
-  variantInputDisabled: {
-    backgroundColor: '#f5f5f5',
-    borderColor: '#e0e0e0',
-  },
-  switchRow: {
+  toggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 8,
   },
-  switchLabel: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '600',
-  },
-  imagePickerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#e63946',
-    borderRadius: 8,
-    borderStyle: 'dashed',
-    gap: 8,
-  },
-  imagePickerText: {
-    fontSize: 14,
-    color: '#e63946',
-    fontWeight: '600',
-  },
-  imageGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
-  imagePreview: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageRemoveBtn: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-  },
-  imageIndexText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+  toggleLabel: {
+    fontSize: 15,
+    color: '#475569',
+    fontWeight: '500',
   },
   saveBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#10b981',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -1362,54 +1042,12 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  productHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  productCategory: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 2,
-  },
-  productActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionBtn: {
-    padding: 8,
-  },
-  productOutOfStock: {
-    color: '#ff6b6b',
-  },
-  addPincodeForm: {
-    padding: 16,
-  },
-  settingCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  settingTitle: {
+  placeholder: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  settingDesc: {
-    fontSize: 13,
-    color: '#666',
-  },
-  slotRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    gap: 12,
-  },
-  slotText: {
-    fontSize: 14,
-    color: '#333',
+    color: '#94a3b8',
+    textAlign: 'center',
+    paddingVertical: 60,
   },
 });
