@@ -80,3 +80,7 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/
+# Expo/Metro cache
+.expo/
+.metro-cache/
+node_modules/.cache/
