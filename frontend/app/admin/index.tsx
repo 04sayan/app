@@ -19,41 +19,45 @@ type Section = 'dashboard' | 'products' | 'categories' | 'inventory' | 'orders' 
 
 // Default Admin Credentials
 const DEFAULT_ADMIN = {
-  email: 'admin@hatbajar.com',
+  username: 'admin',
   password: 'admin123'
 };
 
 export default function HatbajarAdmin() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+    if (!username || !password) {
+      Alert.alert('Error', 'Please enter username and password');
       return;
     }
 
     setLoginLoading(true);
     
-    // Check default credentials
-    if (email === DEFAULT_ADMIN.email && password === DEFAULT_ADMIN.password) {
-      setIsLoggedIn(true);
-      Alert.alert('Success', 'Welcome to Hatbajar Admin!');
-    } else {
-      // Try backend authentication
-      try {
-        const response = await adminAPI.login(email, password);
-        if (response.data.success) {
-          setIsLoggedIn(true);
-        }
-      } catch (error) {
-        Alert.alert('Login Failed', 'Invalid credentials\n\nDefault: admin@hatbajar.com / admin123');
+    try {
+      // Check default credentials first
+      if (username === DEFAULT_ADMIN.username && password === DEFAULT_ADMIN.password) {
+        setIsLoggedIn(true);
+        setLoginLoading(false);
+        return;
       }
+
+      // Try backend authentication
+      const response = await adminAPI.login(username, password);
+      if (response.data.success) {
+        setIsLoggedIn(true);
+      } else {
+        Alert.alert('Login Failed', 'Invalid credentials\n\nDefault: admin / admin123');
+      }
+    } catch (error) {
+      Alert.alert('Login Failed', 'Invalid credentials\n\nDefault: admin / admin123');
+    } finally {
+      setLoginLoading(false);
     }
-    setLoginLoading(false);
   };
 
   const menuItems = [
@@ -81,14 +85,13 @@ export default function HatbajarAdmin() {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.inputLabel}>Email</Text>
+            <Text style={styles.inputLabel}>Username</Text>
             <TextInput
               style={styles.input}
-              placeholder="admin@hatbajar.com"
-              value={email}
-              onChangeText={setEmail}
+              placeholder="admin"
+              value={username}
+              onChangeText={setUsername}
               autoCapitalize="none"
-              keyboardType="email-address"
             />
           </View>
 
@@ -111,7 +114,7 @@ export default function HatbajarAdmin() {
             </TouchableOpacity>
           )}
 
-          <Text style={styles.defaultCreds}>Default: admin@hatbajar.com / admin123</Text>
+          <Text style={styles.defaultCreds}>Default: admin / admin123</Text>
         </View>
       </SafeAreaView>
     );
@@ -151,7 +154,7 @@ export default function HatbajarAdmin() {
             style={styles.logoutButton}
             onPress={() => {
               setIsLoggedIn(false);
-              setEmail('');
+              setUsername('');
               setPassword('');
             }}
           >
@@ -168,7 +171,7 @@ export default function HatbajarAdmin() {
               {menuItems.find(m => m.id === activeSection)?.label}
             </Text>
             <View style={styles.topBarRight}>
-              <Text style={styles.adminEmail}>{email}</Text>
+              <Text style={styles.adminEmail}>{username}</Text>
             </View>
           </View>
 
